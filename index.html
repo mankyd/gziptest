@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html ng-app="gzipApp">
+  <head>
+    <style>
+      svg.chart { font: 10px arial; }
+      g.bar rect { fill: rgb(127, 133, 182); shape-rendering: crispEdges; }
+      g.bar text { fill: black;  }
+      .axis path, .axis line { fill: none; stroke: black; shape-rendering: crispEdges; }
+      .line { fill: none; stroke: rgb(127, 133, 182); stroke-width: 2px; }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.0.7/angular.min.js"></script>
+    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="main.js"></script>
+  </head>
+<body ng-controller="AppCtrl">
+  <input type="number" ng-model="max_cw" />
+  <icw-visual val="data" max_cw="max_cw"></icw-visual>
+</body>
