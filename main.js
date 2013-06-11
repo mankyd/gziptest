@@ -15,8 +15,6 @@ gzipApp.controller('AppCtrl', function AppCtrl ($scope) {
   }, function(data) {
     $scope.data = data;
     $scope.$digest();
-    time_hist(data);
-    compression_hist(data);
   });
 });
 
@@ -55,7 +53,7 @@ gzipApp.directive('icwVisual', function() {
         .attr('class', 'y axis')
         .attr('transform', 'translate(0,0)');
 
-      var redraw = function(n, o) {
+      var redraw = function() {
         if (!scope.data) {
           return;
         }
@@ -153,113 +151,149 @@ gzipApp.directive('icwVisual', function() {
   };
 });
 
-
-var time_hist = function(data) {
-  var chart_width = 820;
-  var chart_height = 100;
-  chart_margins = {
+gzipApp.directive('decompressTimeVisual', function() {
+  margins = {
     top: 10,
     right: 10,
     bottom: 30,
-    left: 10};
+    left: 30};
 
-  var chart = d3.select('body').append('svg')
-    .attr('class', 'chart')
-    .attr('width', chart_width + chart_margins.left + chart_margins.right)
-    .attr('height', chart_height + chart_margins.top + chart_margins.bottom)
-    .append('g')
-      .attr('transform', 'translate(' + chart_margins.left + ',' + chart_margins.top + ')');
+  return {
+    restrict: 'E',
+    scope: {
+      data: '=',
+      animation_duration: '=animationDuration'
+    },
+    link: function(scope, element, attrs) {
+      attrs.width = parseInt(attrs.width || 800);
+      attrs.height = parseInt(attrs.height || 200);
+      var chart = d3.select('body').append('svg')
+        .attr('class', 'chart')
+        .attr('width', attrs.width + margins.left + margins.right)
+        .attr('height', attrs.height + margins.top + margins.bottom)
+        .append('g')
+          .attr('transform', 'translate(' + margins.left + ',' + margins.top + ')');
 
-  var x = d3.scale.linear()
-    .domain([0, d3.max(data, function(r) { return r.time; })])
-    .range([0, chart_width]);
+      var xaxis = chart.append('g')
+          .attr('class', 'x axis')
+          .attr('transform', 'translate(0,'+(attrs.height)+')');
+      var yaxis = chart.append('g')
+        .attr('class', 'y axis')
+        .attr('transform', 'translate(0,0)');
 
-  var hist = d3.layout.histogram()
-    .value(function(d) { return d.time; })
-    .bins(x.ticks(50))
-    (data);
+      var redraw = function() {
+        if (!scope.data) {
+          return;
+        }
 
-  var y = d3.scale.linear()
-    .domain([0, d3.max(hist, function(d) { return d.y; })])
-    .range([chart_height, chart_margins.bottom]);
+        var x = d3.scale.linear()
+          .domain([0, d3.max(scope.data, function(d) { return d.time; })])
+          .range([0, attrs.width]);
 
-  var xaxis = d3.svg.axis().scale(x).orient('bottom');
+        var hist = d3.layout.histogram()
+          .value(function(d) { return d.time; })
+          .bins(x.ticks(50))
+        (scope.data);
 
-  var bar = chart.selectAll('.bar')
-    .data(hist)
-      .enter().append('g')
-        .attr('class', 'bar')
-        .attr('transform', function(d) { return 'translate('+ x(d.x) + ',' + y(d.y) + ')'; });
+        var y = d3.scale.linear()
+          .domain([0, d3.max(hist, function(d) { return d.y; })])
+          .range([attrs.height, margins.bottom]);
 
-  bar.append('rect')
-    .attr('x', 1)
-    .attr('width', x(hist[0].dx) - 1)
-    .attr('height', function(d) { return chart_height - y(d.y); });
 
-  bar.append('text')
-    .attr('dy', '-.75em')
-    .attr('y', 6)
-    .attr('x', x(hist[0].dx) / 2)
-    .attr('text-anchor', 'middle')
-    .text(function(d) { return d.y; });
+        var bars = chart.selectAll('.bar')
+          .data(hist);
+        var new_bars = bars.enter().append('g')
+          .attr('class', 'bar')
+          .attr('transform', function(d) { return 'translate('+ x(d.x) + ',' + y(d.y) + ')'; });
+        new_bars.append('rect')
+          .attr('x', 1)
+          .attr('width', x(hist[0].dx) - 1)
+          .attr('height', function(d) { return attrs.height - y(d.y); });
 
-  chart.append('g')
-      .attr('class', 'x axis')
-          .attr('transform', 'translate(0,'+(chart_height)+')')
-              .call(xaxis);
-};
+        new_bars.append('text')
+          .attr('dy', '-.75em')
+          .attr('y', 6)
+          .attr('x', x(hist[0].dx) / 2)
+          .attr('text-anchor', 'middle')
+          .text(function(d) { return d.y; });
 
-var compression_hist = function(data) {
-  var chart_width = 820;
-  var chart_height = 100;
-  chart_margins = {
+        xaxis.call(d3.svg.axis().scale(x).orient('bottom'));
+      };
+
+      scope.$watch('data', redraw);
+    }
+  };
+});
+
+gzipApp.directive('compressionRatioVisual', function() {
+  margins = {
     top: 10,
     right: 10,
     bottom: 30,
-    left: 10};
+    left: 30};
 
-  var chart = d3.select('body').append('svg')
-    .attr('class', 'chart')
-    .attr('width', chart_width + chart_margins.left + chart_margins.right)
-    .attr('height', chart_height + chart_margins.top + chart_margins.bottom)
-    .append('g')
-      .attr('transform', 'translate(' + chart_margins.left + ',' + chart_margins.top + ')');
+  return {
+    restrict: 'E',
+    scope: {
+      data: '=',
+      animation_duration: '=animationDuration'
+    },
+    link: function(scope, element, attrs) {
+      attrs.width = parseInt(attrs.width || 800);
+      attrs.height = parseInt(attrs.height || 200);
+      var chart = d3.select('body').append('svg')
+        .attr('class', 'chart')
+        .attr('width', attrs.width + margins.left + margins.right)
+        .attr('height', attrs.height + margins.top + margins.bottom)
+        .append('g')
+          .attr('transform', 'translate(' + margins.left + ',' + margins.top + ')');
 
-  var x = d3.scale.linear()
-    .domain([0, d3.max(data, function(r) { return r.ratio; })])
-    .range([0, chart_width]);
+      var xaxis = chart.append('g')
+          .attr('class', 'x axis')
+          .attr('transform', 'translate(0,'+(attrs.height)+')');
+      var yaxis = chart.append('g')
+        .attr('class', 'y axis')
+        .attr('transform', 'translate(0,0)');
 
-  var hist = d3.layout.histogram()
-    .value(function(d) { return d.ratio; })
-    .bins(x.ticks(50))
-    (data);
+      var redraw = function() {
+        if (!scope.data) {
+          return;
+        }
 
-  var y = d3.scale.linear()
-    .domain([0, d3.max(hist, function(d) { return d.y; })])
-    .range([chart_height, chart_margins.bottom]);
+        var x = d3.scale.linear()
+          .domain([0, d3.max(scope.data, function(d) { return d.ratio; })])
+          .range([0, attrs.width]);
 
-  var xaxis = d3.svg.axis().scale(x).orient('bottom');
+        var hist = d3.layout.histogram()
+          .value(function(d) { return d.ratio; })
+          .bins(x.ticks(50))
+        (scope.data);
 
-  var bar = chart.selectAll('.bar')
-    .data(hist)
-      .enter().append('g')
-        .attr('class', 'bar')
-        .attr('transform', function(d) { return 'translate('+ x(d.x) + ',' + y(d.y) + ')'; });
+        var y = d3.scale.linear()
+          .domain([0, d3.max(hist, function(d) { return d.y; })])
+          .range([attrs.height, margins.bottom]);
 
-  bar.append('rect')
-    .attr('x', 1)
-    .attr('width', x(hist[0].dx) - 1)
-    .attr('height', function(d) { return chart_height - y(d.y); });
+        var bars = chart.selectAll('.bar')
+          .data(hist);
+        var new_bars = bars.enter().append('g')
+          .attr('class', 'bar')
+          .attr('transform', function(d) { return 'translate('+ x(d.x) + ',' + y(d.y) + ')'; });
+        new_bars.append('rect')
+          .attr('x', 1)
+          .attr('width', x(hist[0].dx) - 1)
+          .attr('height', function(d) { return attrs.height - y(d.y); });
 
-  bar.append('text')
-    .attr('dy', '-.75em')
-    .attr('y', 6)
-    .attr('x', x(hist[0].dx) / 2)
-    .attr('text-anchor', 'middle')
-    .text(function(d) { return d.y; });
+        new_bars.append('text')
+          .attr('dy', '-.75em')
+          .attr('y', 6)
+          .attr('x', x(hist[0].dx) / 2)
+          .attr('text-anchor', 'middle')
+          .text(function(d) { return d.y; });
 
-  chart.append('g')
-      .attr('class', 'x axis')
-          .attr('transform', 'translate(0,'+(chart_height)+')')
-              .call(xaxis);
-};
+        xaxis.call(d3.svg.axis().scale(x).orient('bottom'));
+      };
+
+      scope.$watch('data', redraw);
+    }
+  };
+});
