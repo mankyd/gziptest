@@ -1,6 +1,10 @@
 var gzipApp = angular.module('gzipApp', []);
 gzipApp.controller('AppCtrl', function AppCtrl ($scope) {
   $scope.max_cw = 64;
+  $scope.icw = 10;
+  $scope.animation_duration = 200;
+  $scope.ssthresh = 64000;
+  $scope.mtu = 1400;
   d3.csv('results.csv', function(d) {
     return {url: d.url,
             compressed_size: parseInt(d.compressed_size),
@@ -13,115 +17,138 @@ gzipApp.controller('AppCtrl', function AppCtrl ($scope) {
     $scope.$digest();
     time_hist(data);
     compression_hist(data);
-    congestion_window(data);
   });
-
 });
 
 gzipApp.directive('icwVisual', function() {
-  var chart_width = 820;
-  var chart_height = 100;
   chart_margins = {
     top: 10,
     right: 10,
     bottom: 30,
-    left: 10};
+    left: 30};
 
   return {
     restrict: 'E',
     scope: {
-      val: '=',
-      grouped: '='
+      data: '=',
+      max_cw: '=maxCw',
+      icw: '=',
+      ssthresh: '=',
+      mtu: '=',
+      animation_duration: '=animationDuration'
     },
-    link: function(scope, element, attrs) {      
+    link: function(scope, element, attrs) {
+      attrs.width = parseInt(attrs.width || 800);
+      attrs.height = parseInt(attrs.height || 200);
+
       var chart = d3.select(element[0]).append('svg')
-      .attr('class', 'chart')
-      .attr('width', chart_width + chart_margins.left + chart_margins.right)
-      .attr('height', chart_height + chart_margins.top + chart_margins.bottom)
-      .append('g')
-        .attr('transform', 'translate(' + chart_margins.left + ',' + chart_margins.top + ')');
+        .attr('class', 'chart')
+        .attr('width', attrs.width + chart_margins.left + chart_margins.right)
+        .attr('height', attrs.height + chart_margins.top + chart_margins.bottom)
+        .append('g')
+          .attr('transform', 'translate(' + chart_margins.left + ',' + chart_margins.top + ')');
 
-      scope.$watch('max_cw', function(new_val, old_val) {
-        console.log(new_val);
-      });
+      var xaxis = chart.append('g')
+          .attr('class', 'x axis')
+          .attr('transform', 'translate(0,'+(attrs.height)+')');
+      var yaxis = chart.append('g')
+        .attr('class', 'y axis')
+        .attr('transform', 'translate(0,0)');
 
-      scope.$watch('val', function(data, old_val) {
-        if (!data) {
+      var redraw = function(n, o) {
+        if (!scope.data) {
           return;
         }
         // a theoretical model of tcp slow start
-        var icw = 10;
-        var cw = icw;
-        var ssthresh = 64000;
-        var max_cw = 64;
-        var packet_size = 1500;
-        var max_size = d3.max(data, function(d) { return d.decompressed_size; });
-        var data = [];
+        var cw = scope.icw;
+        var ssthresh = scope.ssthresh;
+        var max_size = d3.max(scope.data, function(d) { return d.decompressed_size; });
+
+        var cw_data = [];
+        var packet_data = [0];
 
         while (max_size > 0) {
-          data.push(cw);
-          max_size -= cw * packet_size;
-          if (cw >= Math.floor(ssthresh / packet_size)) {
+          cw_data.push(cw);
+          packet_data.push(packet_data[packet_data.length-1] + cw);
+
+          max_size -= cw * scope.mtu;
+          if (cw >= Math.floor(ssthresh / scope.mtu)) {
             cw += 1;
           }
           else {
             cw *= 2;
-            if (cw * packet_size > ssthresh) {
-              cw = Math.floor(ssthresh / packet_size);
+            if (cw * scope.mtu > ssthresh) {
+              cw = Math.floor(ssthresh / scope.mtu);
             }
           }
-          if (cw > max_cw) {
-            ssthresh = cw * packet_size / 2;
-            cw = icw;
+          if (cw > scope.max_cw) {
+            ssthresh = cw * scope.mtu / 2;
+            cw = scope.icw;
           }
         }
-
-        console.log(data);
+        // remove 0 off the front of our packet_data
+        packet_data.shift();
 
         var x = d3.scale.linear()
-          .domain([0, data.length])
-          .range([0, chart_width]);
+          .domain([0, cw_data.length])
+          .range([0, attrs.width]);
 
-        /*
-  var hist = d3.layout.histogram()
-    .value(function(d) { return d.ratio; })
-    .bins(x.ticks(50))
-    (data);
-*/
-        var y = d3.scale.linear()
-        .domain([0, d3.max(data)])
-        .range([chart_height, chart_margins.bottom]);
+        var cw_y = d3.scale.linear()
+        .domain([0, d3.max(cw_data)])
+        .range([attrs.height, chart_margins.bottom]);
 
-        var line_gen = d3.svg.line()
+        var packet_y = d3.scale.linear()
+        .domain([0, d3.max(packet_data)])
+        .range([attrs.height, chart_margins.bottom]);
+
+        var cw_line = d3.svg.line()
         .x(function(d, i) { return x(i); })
-        .y(function(d) { return y(d); });
+        .y(function(d) { return cw_y(d); });
 
-        var xaxis = d3.svg.axis().scale(x).orient('bottom');
+        var packet_line = d3.svg.line()
+        .x(function(d, i) { return x(i); })
+        .y(function(d) { return packet_y(d); });
 
-        var bar = chart.selectAll('.point')
-        .data(data)
-        .enter().append('g')
-        .attr('class', 'point')
-        .attr('transform', function(d, i) { return 'translate('+ x(i) + ',' + y(d) + ')'; });
 
-        chart.append('path')
-        .attr('class', 'line')
-        .datum(data)
-        .attr('d', line_gen);
+        var path = chart.selectAll('path.line')
+          .data([
+            {
+              css_class: 'cw',
+              line_gen: cw_line,
+              data: cw_data
+            },
+            {
+              css_class: 'packet',
+              line_gen: packet_line,
+              data: packet_data
+            }
+                ]);
 
-        /*
-  bar.append('text')
-    .attr('dy', '-.75em')
-    .attr('y', 6)
-    .attr('x', x(hist[0].dx) / 2)
-    .attr('text-anchor', 'middle')
-    .text(function(d) { return d.y; });
-*/
-        chart.append('g')
-        .attr('class', 'x axis')
-        .attr('transform', 'translate(0,'+(chart_height)+')')
-        .call(xaxis);
-      });
+       path
+        .transition().duration(scope.animation_duration)
+          .attr('d', function(d) { return d.line_gen(d.data); });
+
+        path.enter().append('path')
+          .attr('class', function(d) { return 'line ' + d.css_class; })
+          .attr('d', function(d, i) { return d.line_gen(d.data); });
+        path.exit().remove();
+
+        xaxis
+          .transition().duration(scope.animation_duration)
+            .call(d3.svg.axis().scale(x).orient('bottom'));
+
+        yaxis
+          .transition().duration(scope.animation_duration)
+            .call(d3.svg.axis().scale(cw_y).orient('left'));
+
+
+      };
+
+      scope.$watch('max_cw', redraw);
+      scope.$watch('icw', redraw);
+      scope.$watch('data', redraw);
+      scope.$watch('mtu', redraw);
+      scope.$watch('ssthresh', redraw);
     }
   };
 });
@@ -235,7 +262,4 @@ var compression_hist = function(data) {
       .attr('class', 'x axis')
           .attr('transform', 'translate(0,'+(chart_height)+')')
               .call(xaxis);
-};
-
-var congestion_window = function(data) {
 };

@@ -6,13 +6,32 @@
       g.bar rect { fill: rgb(127, 133, 182); shape-rendering: crispEdges; }
       g.bar text { fill: black;  }
       .axis path, .axis line { fill: none; stroke: black; shape-rendering: crispEdges; }
-      .line { fill: none; stroke: rgb(127, 133, 182); stroke-width: 2px; }
+      .line { fill: none; stroke-width: 2px; }
+      .line.cw { stroke: rgb(127, 133, 182); }
+      .line.packet { stroke: rgb(255, 178, 13); }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.0.7/angular.min.js"></script>
     <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
     <script src="main.js"></script>
   </head>
 <body ng-controller="AppCtrl">
-  <input type="number" ng-model="max_cw" />
-  <icw-visual val="data" max_cw="max_cw"></icw-visual>
+  <form  name="mf">
+    <label>
+      Max CW:
+      <input name="maxcw" type="number" ng-model="max_cw" min="1" ng-pattern="/^\d+$/" />
+    </label>
+    <label>
+      SS Threshold:
+      <input name="sshthresh" type="number" ng-model="ssthresh" min="1" ng-pattern="/^\d+$/" />
+    </label>
+    <label>
+      MTU:
+      <input name="mtu" type="number" ng-model="mtu" min="1" ng-pattern="/^\d+$/" />
+    </label>
+    <label>
+      Initial CW:
+      <input name="icw" type="number" ng-model="icw" min="1" ng-pattern="/^\d+$/" />
+    </label>
+  </form>
+  <icw-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" animation-duration="animation_duration" width="520" height="200"></icw-visual>
 </body>
