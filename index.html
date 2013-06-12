@@ -11,7 +11,7 @@
       .line.packet { stroke: rgb(255, 178, 13); }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.0.7/angular.min.js"></script>
-    <script src="http://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="http://d3js.org/d3.v3.js" charset="utf-8"></script>
     <script src="main.js"></script>
   </head>
 <body ng-controller="AppCtrl">
@@ -28,13 +28,18 @@
       MTU:
       <input name="mtu" type="number" ng-model="mtu" min="1" ng-pattern="/^\d+$/" />
     </label>
-    <label>
+   <label>
       Initial CW:
       <input name="icw" type="number" ng-model="icw" min="1" ng-pattern="/^\d+$/" />
     </label>
+   <label>
+      RTT:
+      <input name="rtt" type="number" ng-model="rtt" min="1" ng-pattern="/^\d+$/" />
+    </label>
   </form>
-  <icw-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" animation-duration="animation_duration" width="520" height="200"></icw-visual>
+  <icw-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt" animation-duration="animation_duration" width="520" height="200"></icw-visual>
   <decompress-time-visual data="data" animation-duration="animation_duration" width="520" height="200"></decompress-time-visual>
   <compression-ratio-visual data="data" animation-duration="animation_duration" width="520" height="200"></compression-ratio-visual>
+  <seconds-saved-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt" animation-duration="animation_duration" width="520" height="200"></seconds-saved-visual>
 
 </body>
