@@ -104,28 +104,35 @@
           relative to the total send time for the payload.
         </p>
         <p>
-          And yet, for small data payloads, much of this extra caution is expensive.
-          Most computer systems will start out only sending 2, 3 or 10 "packets" of
-          data before pausing. For reference, 10 packets is approximately 14KB of 
-          data. Thus, a 15KB file that fits into 11 packets is broken up into 2
-          separate chunks of packets. The second chunk has to wait on the first to
-          finish before it can be sent. Even on a fast connection, it can take 20ms
-          or so for all the packets in the first chunk to be "ACK'ed". Suddenly, a
-          tiny 15KB file that should transfer in 2ms on our super-fast data connection
-          is taking ten times as long. And 20ms is quite good; it is common to see
-          RTTs of 30 to 60ms.
+          And yet, for small data payloads, much of this extra caution is 
+          expensive. Most computer systems will start out only sending 2, 3 or 
+          10 "packets" of data before pausing. For reference, 10 packets is 
+          approximately 14KB of data. Thus, a 15KB file that fits into 11 
+          packets is broken up into 2 separate chunks of packets. The second 
+          chunk has to wait on the first to finish before it can be sent. Even 
+          on a fast connection, it can take 20ms or so for all the packets in 
+          the first chunk to be "ACK'ed". Suddenly, a tiny 15KB file that should
+          transfer in 2ms on our super-fast data connection is taking ten times 
+          as long. And 20ms is on the optimistic side; it is common to see RTTs 
+          of 30 to 60ms. For international communication, you can have RTTs in 
+          the hundreds. (A quick test of baidu.com gives me a 600ms average!)
         </p>
         <p>
           These "chunks" as I have referred to them are what's known as a 
-          "congestion window", CWND for short. Whereas a packet of data represents
-          a set of bits, a CWND represents a set of packets. Slow-start is the 
-          mechanism that controls the size and growth of the CWND. As referenced 
-          before, the initial congestion (ICWND) starts small and grows over time.
+          "congestion window", CWND for short. Whereas a packet of data 
+          represents a set of bits, a CWND represents a set of packets. 
+          Slow-start is the mechanism that controls the size and growth of the 
+          CWND. As referenced before, the initial congestion window (ICWND) 
+          starts small and grows over time.
         </p>
         <p>
-          A full overview of how TCP slow-start works would require an article in and 
-          of itself. Maybe I'll write that article some day, but for now, enough with
-          the words, let's see some pictures!
+          A full overview of how TCP slow-start works would require an article 
+          in and of itself. My colleague Ilya Grigorik has
+          <a href="http://www.igvita.com/2011/10/20/faster-web-vs-tcp-slow-start/">
+            an article that digs into slow-start and discusses how to deal
+            with it</a>. Maybe some day I'll write a more in depth article on
+            slow-start's finer points, but for now enough with the words, let's 
+            see some pictures!
         </p>
         <h2>gzip to the Rescue</h2>
         <figure class="thumbnail">
@@ -164,7 +171,7 @@
             A histogram showing the number of round trips saved by gzip for the 
             sites sampled. The number at the top shows the number of sites that
             saved the given number of round trips. Use the controls above to see how
-            different parameters can effect the round trips saved.
+            different parameters can affect the round trips saved.
           </figcaption>
         </figure>
         <p>
@@ -174,16 +181,20 @@
           need to occur and thus avoid the associated latency costs.
         </p>
         <p>
-          Notices that there is a statistically significant number of sites for which
-          gzip <em>does not</em> appear save any round trips. There are few things to 
-          keep in mind before jumping to conclusions about this apparent anomaly.
+          Notices that there is a statistically significant number of sites for
+          which gzip <em>does not</em> appear save any round trips. There are a
+          few things to keep in mind before jumping to conclusions about this
+          apparent anomaly.
         </p>
         <p>
-          First, some of the sites scraped returned exceptionally small pages and 
-          should be excluded. Some sites, for instance, returned error pages because
-          the scaper was not logged in or did not have the right cookies set. Still 
-          others simply don't have a proper home page because they are merely CDN's
-          or other non-public facing pages. Pages such as these add noise to the data.
+          First, some of the sites scraped returned exceptionally small pages
+          and should be excluded. Some sites, for instance, returned error pages
+          because the scaper was not logged in or did not have the right cookies
+          set. Still others simply don't have a proper home page because they 
+          are merely CDN's or other non-public facing pages. Pages such as these
+          add noise to the data. In light of this fact, we would actualy expect
+          the savings coming from gzip to improve if a more comprehensive sample
+          of the web was taken.
         </p>
         <p>
           Second, even for the rare page where compression doesn't explicitly save a
@@ -205,7 +216,10 @@
         <p>
           Lastly, do not forget that what is shown above is a very idealistic model.
           Real world results for TCP behavior may vary wildly, both from server to
-          server and connection to connection.
+          server and connection to connection. There are 
+          <a href="http://en.wikipedia.org/wiki/TCP_congestion_avoidance_algorithm">
+            many algorithms that affect TCP slow-start</a>, and each will change
+          the end result.
         </p>
         <figure class="thumbnail">
           <decompress-time-visual data="data" animation-duration="animation_duration" width="690" height="200"></decompress-time-visual>
@@ -219,8 +233,8 @@
           And this brings up back full circle to the <em>costs</em> of using 
           gzip. As the figure above shows, gzip is cheap. It is generally two 
           orders of magnitude faster than even a single rtt. Thus, if 
-          compressing your content saves you even a single round trip, it will 
-          easily be worth the expense.
+          compressing your content might possibly save you even a single round
+          trip, it will easily be worth the nominal expense.
         </p>
 
         <h2 id="conclusion">Conclusion</h2>
