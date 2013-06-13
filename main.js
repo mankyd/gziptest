@@ -1,11 +1,12 @@
-var gzipApp = angular.module('gzipApp', []);
-gzipApp.controller('AppCtrl', function AppCtrl ($scope) {
+var gzipApp = angular.module('gzipApp', ['ui.bootstrap']);
+gzipApp.controller('GzipCtrl', function AppCtrl ($scope) {
   $scope.max_cw = 64;
   $scope.icw = 10;
   $scope.animation_duration = 200;
   $scope.ssthresh = 42;
   $scope.mtu = 1400;
   $scope.rtt = 50;
+  $scope.congestion_algorithm = 'tahoe';
   d3.csv('results.csv', function(d) {
     return {url: d.url,
             compressed_size: parseInt(d.compressed_size),
@@ -88,9 +89,9 @@ var TCPReno = function(icw, max_cw, ssthresh, mtu, num_bytes) {
 gzipApp.directive('icwVisual', function() {
   var margins = {
     top: 10,
-    right: 30,
+    right: 50,
     bottom: 30,
-    left: 40};
+    left: 50};
 
   return {
     restrict: 'E',
@@ -101,6 +102,7 @@ gzipApp.directive('icwVisual', function() {
       ssthresh: '=',
       mtu: '=',
       rtt: '=',
+      congestion_algorithm: '=congestionAlgorithm',
       animation_duration: '=animationDuration'
     },
     link: function(scope, element, attrs) {
@@ -123,68 +125,186 @@ gzipApp.directive('icwVisual', function() {
       var cw_axis = axis_group.append('g')
         .attr('class', 'x axis cw')
         .attr('transform', 'translate(0,' + (margins.top + 20) + ')');
-      var yaxis = axis_group.append('g')
+      var cw_packets_axis = axis_group.append('g')
         .attr('class', 'y axis')
         .attr('transform', 'translate(0,0)');
+      var total_packets_axis = axis_group.append('g')
+        .attr('class', 'y axis')
+        .attr('transform', 'translate('+attrs.width+',0)');
+
+      axis_group.append('text')
+        .attr('class', 'axis-label rt')
+        .text('Round Trips')
+        .attr('x', attrs.width / 2)
+        .attr('y', 5);
+
+      axis_group.append('text')
+        .attr('class', 'axis-label cwnd')
+        .text('CWND Size (packets)')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -attrs.height / 2 - margins.top * 2)
+        .attr('dy', -30);
+
+      axis_group.append('text')
+        .attr('class', 'axis-label time')
+        .text('Time')
+        .attr('x', attrs.width / 2)
+        .attr('y', attrs.height)
+        .attr('dy', 30);
+
+      axis_group.append('text')
+        .attr('class', 'axis-label packets')
+        .text('Total Packets')
+        .attr('transform', 'rotate(90)')
+        .attr('x', attrs.height / 2 + margins.top)
+        .attr('y', -attrs.width)
+        .attr('dy', -30);
 
       var redraw = function() {
         if (!scope.data) {
           return;
         }
 
-        var tcp_data = TCPTahoe(scope.icw, scope.max_cw, scope.ssthresh, scope.mtu, 
-                                d3.max(scope.data, function(d) { return d.decompressed_size; }));
+        var congestion_algorithm = TCPTahoe;
+        switch(scope.congestion_algorithm) {
+        case 'reno':
+          congestion_algorithm = TCPReno;
+          break;
+        }
+        var decompressed_tcp_data = congestion_algorithm(
+            scope.icw, scope.max_cw, scope.ssthresh, scope.mtu, 
+            d3.max(scope.data, function(d) { return d.decompressed_size; }));
+        var compressed_tcp_data = congestion_algorithm(
+            scope.icw, scope.max_cw, scope.ssthresh, scope.mtu, 
+            d3.max(scope.data, function(d) { return d.compressed_size; }));
 
-        var cw_data = tcp_data[0];
-        var packet_data = tcp_data[1];
+        var cw_data = decompressed_tcp_data[0];
+        var decompressed_data = decompressed_tcp_data[1];
+        var compressed_data = compressed_tcp_data[1];
 
         var x = d3.scale.linear()
-          .domain([0, cw_data.length])
+          .domain([0, cw_data.length - 1])
           .range([0, attrs.width]);
 
         var cw_y = d3.scale.linear()
-        .domain([0, d3.max(cw_data)])
-        .range([attrs.height, margins.bottom]);
+          .domain([0, d3.max(cw_data)])
+          .range([attrs.height, margins.bottom]);
 
         var packet_y = d3.scale.linear()
-        .domain([0, d3.max(packet_data)])
-        .range([attrs.height, margins.bottom]);
+          .domain([0, d3.max(decompressed_data)])
+          .range([attrs.height, margins.bottom]);
 
         var cw_line = d3.svg.line()
-        .x(function(d, i) { return x(i); })
-        .y(function(d) { return cw_y(d); });
+          .x(function(d, i) { return x(i); })
+          .y(function(d) { return cw_y(d); });
 
         var packet_line = d3.svg.line()
-        .x(function(d, i) { return x(i); })
-        .y(function(d) { return packet_y(d); });
+          .x(function(d, i) { return x(i); })
+          .y(function(d) { return packet_y(d); });
 
+        var packet_area = d3.svg.area()
+          .x(function(d, i) { return x(i); })
+          .y0(attrs.height)
+          .y1(function(d) { return packet_y(d); });
 
         var path = chart.selectAll('path.line')
           .data([
             {
-              css_class: 'cw',
-              line_gen: cw_line,
-              data: cw_data
-            },
-            {
               css_class: 'packet',
               line_gen: packet_line,
-              data: packet_data
-            }
-                ]);
+              data: decompressed_data,
+              id: 'packet-path'
+            },
+            {
+              css_class: 'cw',
+              line_gen: cw_line,
+              data: cw_data,
+              id: 'cwnd-path'
+            }]);
 
-       path
-        .transition().duration(scope.animation_duration)
-          .attr('d', function(d) { return d.line_gen(d.data); });
+        var area = chart.selectAll('path.area')
+          .data([
+            {
+              css_class: 'decompressed',
+              data: decompressed_data
+            },
+            {
+              css_class: 'compressed',
+              data: compressed_data
+            }])
+
+        area.enter().append('path')
+          .attr('class', function(d) { return 'area ' + d.css_class; });
+        area
+          .transition().duration(scope.animation_duration)
+          .attr('d', function(d) { return packet_area(d.data); });
+        area.exit().remove();
+
 
         path.enter().append('path')
           .attr('class', function(d) { return 'line ' + d.css_class; })
-          .attr('d', function(d, i) { return d.line_gen(d.data); });
+          .attr('id', function(d) { return d.id; });
+        path
+          .transition().duration(scope.animation_duration)
+          .attr('d', function(d) { return d.line_gen(d.data); });
         path.exit().remove();
 
+
+        var area_labels = chart.selectAll('text.area-label')
+          .data([
+            {
+              css_class: 'gzipped',
+              label: 'gzipped',
+              dx: -4,
+              position: compressed_data.length -1,
+            },
+            {
+              css_class: 'decompressed',
+              label: 'not-gzipped',
+              dx: 6,
+              position: compressed_data.length -1
+            }]);
+
+        area_labels.enter().append('text')
+          .attr('class', function(d) { return 'area-label ' + d.css_class; })
+          .attr('dy', -4)
+          .attr('dx', function(d) { return d.dx; })
+          .text(function(d) { return d.label });
+        area_labels
+          .transition().duration(scope.animation_duration)
+          .attr('y', attrs.height)
+          .attr('x', function(d) { return x(d.position); });
+
+        var path_labels = chart.selectAll('text.path-label')
+          .data([
+            {
+              css_class: 'congestion-window',
+              label: 'Congestion Window',
+              path_id: 'cwnd-path',
+              dx: 20
+            },
+            {
+              css_class: 'packets',
+              label: 'Total Packets Sent',
+              path_id: 'packet-path',
+              dx: 200
+            }]);
+
+        path_labels.enter().append('text')
+          .attr('class', function(d) { return 'path-label ' + d.css_class; })
+          .attr('dx', function(d) { return d.dx; })
+          .attr('dy', -4)
+          .append('textPath')
+            .attr('xlink:href', function(d) { return '#' + d.path_id; })
+            .text(function(d) { return d.label });
+
         var formatMillis = function(millis) {
+          if (millis >= 60 * 1000) {
+            return d3.format('.1f')(millis / 60000) + 'm';
+          }
+
           if (millis >= 100) {
-            return d3.format('.2g')(millis / 1000) + 's';
+            return d3.format('.2f')(millis / 1000) + 's';
           }
           return millis + 'ms';
         };
@@ -201,9 +321,13 @@ gzipApp.directive('icwVisual', function() {
           .transition().duration(scope.animation_duration)
             .call(d3.svg.axis().scale(x).orient('top'));
 
-        yaxis
+        cw_packets_axis
           .transition().duration(scope.animation_duration)
             .call(d3.svg.axis().scale(cw_y).orient('left'));
+
+        total_packets_axis
+          .transition().duration(scope.animation_duration)
+            .call(d3.svg.axis().scale(packet_y).orient('right'));
       };
 
       scope.$watch('max_cw', redraw);
@@ -212,6 +336,7 @@ gzipApp.directive('icwVisual', function() {
       scope.$watch('mtu', redraw);
       scope.$watch('ssthresh', redraw);
       scope.$watch('rtt', redraw);
+      scope.$watch('congestion_algorithm', redraw);
     }
   };
 });
@@ -355,7 +480,8 @@ gzipApp.directive('compressionRatioVisual', function() {
           .attr('text-anchor', 'middle')
           .text(function(d) { return d.y; });
 
-        xaxis.call(d3.svg.axis().scale(x).orient('bottom'));
+        xaxis.call(
+          d3.svg.axis().scale(x).orient('bottom').tickFormat(d3.format('%')));
       };
 
       scope.$watch('data', redraw);
@@ -379,6 +505,7 @@ gzipApp.directive('secondsSavedVisual', function() {
       mtu: '=',
       ssthresh: '=',
       rtt: '=',
+      congestion_algorithm: '=congestionAlgorithm',
       animation_duration: '=animationDuration'
     },
     link: function(scope, element, attrs) {
@@ -408,13 +535,19 @@ gzipApp.directive('secondsSavedVisual', function() {
           return;
         }
 
+        var congestion_algorithm = TCPTahoe;
+        switch(scope.congestion_algorithm) {
+        case 'reno':
+          congestion_algorithm = TCPReno;
+          break;
+        }
         var rtts_saved = [];
         var i;
         for (i = 0; i < scope.data.length; i++) {
-          var decompressed_windows = TCPTahoe(
+          var decompressed_windows = congestion_algorithm(
             scope.icw, scope.max_cw, scope.ssthresh, scope.mtu, 
             scope.data[i].decompressed_size)[0].length;
-          var compressed_windows = TCPTahoe(
+          var compressed_windows = congestion_algorithm(
               scope.icw, scope.max_cw, scope.ssthresh, scope.mtu, 
               scope.data[i].compressed_size)[0].length;
           rtts_saved.push(decompressed_windows - compressed_windows);
@@ -475,6 +608,7 @@ gzipApp.directive('secondsSavedVisual', function() {
       scope.$watch('mtu', redraw);
       scope.$watch('ssthresh', redraw);
       scope.$watch('rtt', redraw);
+      scope.$watch('congestion_algorithm', redraw);
     }
   };
 });

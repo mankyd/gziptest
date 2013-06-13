@@ -8,23 +8,31 @@
       .container { margin: auto; }
       figure { -webkit-margin-start: 0; -webkit-margin-end: 0; }
       figure .visual { display: block; }
-      figcaption { font-size: 12px; margin: 0 20px; }
+      figcaption { font-size: 12px; margin: 0 20px 10px; line-height: 15px; }
       p { font-family: "Times New Roman", serif; font-size: 16px; line-height: 22px; margin-bottom: 18px; }
       .tcp-controls label { display: inline-block; margin-right: 18px; }
       .tcp-controls input { width: 60px; display: block; }
+      a.reference { vertical-align: super; font-size: 12px; }
       svg.chart { font: 10px arial; }
       g.bar rect { fill: rgb(127, 133, 182); shape-rendering: crispEdges; }
       g.bar text { fill: black;  }
       .axis path, .axis line { fill: none; stroke: black; shape-rendering: crispEdges; }
+      .axis-label { text-anchor: middle; }
       .line { fill: none; stroke-width: 2px; }
       .line.cw { stroke: rgb(127, 133, 182); }
       .line.packet { stroke: rgb(255, 178, 13); }
+      .area { stroke: none; }
+      .area.compressed { fill: rgb(199, 255, 199); }
+      .area.decompressed { fill: rgb(255, 208, 208); }
+      .area-label.gzipped { text-anchor: end; }
+      .area-label.decompressed { text-anchor: start; }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.0.7/angular.min.js"></script>
     <script src="http://d3js.org/d3.v3.js" charset="utf-8"></script>
+    <script src="ui-bootstrap-tpls-0.3.0.min.js"></script>
     <script src="main.js"></script>
   </head>
-<body ng-controller="AppCtrl">
+<body ng-controller="GzipCtrl">
   <div class="container">
     <div class="row">
       <div class="span9 offset1">
@@ -63,7 +71,7 @@
           <compression-ratio-visual class="visual" data="data" animation-duration="animation_duration" width="690" height="200"></compression-ratio-visual>
           <figcaption>
             Most sampled pages compresses to between 15% and 35% of its original
-            size.
+            size. The average page is compressed to 24.9% of its original size.
           </figcaption>
         </figure>
         <p>
@@ -136,15 +144,18 @@
         </p>
         <h2>gzip to the Rescue</h2>
         <figure class="thumbnail">
-          <icw-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt" animation-duration="animation_duration" width="690" height="200"></icw-visual>
+          <icw-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt"  congestion-algorithm="congestion_algorithm" animation-duration="animation_duration" width="690" height="200"></icw-visual>
           <figcaption>
             A visualization of the congestion window and download time for the
-            largest page sampled. Use the contols below to see how different 
-            parameters affect the TCP pattern.
+            largest page sampled. The area in green represents the time to 
+            download the gzipped page. The area in red represents the additional
+            amounnt of time the non-gzipped page would have taken. Use the 
+            contols below to see how different parameters affect the TCP
+            pattern.
           </figcaption>
         </figure>
         <form name="tcp_controls" class="tcp-controls well">
-         <label>
+          <label>
             ICWND (packets):
             <input name="icw" type="number" ng-model="icw" min="1" ng-pattern="/^\d+$/" />
           </label>
@@ -160,13 +171,20 @@
             MTU (bytes):
             <input name="mtu" type="number" ng-model="mtu" min="1" ng-pattern="/^\d+$/" />
           </label>
-         <label>
+          <label>
             RTT (ms):
             <input name="rtt" type="number" ng-model="rtt" min="1" ng-pattern="/^\d+$/" />
           </label>
+          <div>
+           Congestion Algorithm<a href="http://en.wikipedia.org/wiki/TCP_congestion_avoidance_algorithm#TCP_Tahoe_and_Reno" class="reference" target="_blank">?</a>:
+           <div class="btn-group" data-toggle="buttons-radio">
+             <button class="btn btn-small" btn-radio="'tahoe'" ng-model="congestion_algorithm">Tahoe</button>
+             <button class="btn btn-small" btn-radio="'reno'" ng-model="congestion_algorithm">Reno</button>
+           </div>
+          </div>
         </form>
         <figure class="thumbnail">
-          <seconds-saved-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt" animation-duration="animation_duration" width="690" height="200"></seconds-saved-visual>
+          <seconds-saved-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt" congestion-algorithm="congestion_algorithm" animation-duration="animation_duration" width="690" height="200"></seconds-saved-visual>
           <figcaption>
             A histogram showing the number of round trips saved by gzip for the 
             sites sampled. The number at the top shows the number of sites that
@@ -192,7 +210,7 @@
           because the scaper was not logged in or did not have the right cookies
           set. Still others simply don't have a proper home page because they 
           are merely CDN's or other non-public facing pages. Pages such as these
-          add noise to the data. In light of this fact, we would actualy expect
+          add noise to the data. In light of this fact, we would actually expect
           the savings coming from gzip to improve if a more comprehensive sample
           of the web was taken.
         </p>
