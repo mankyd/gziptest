@@ -28,140 +28,217 @@
   <div class="container">
     <div class="row">
       <div class="span9 offset1">
-  <h1>Quantifying gzip's Impact on Web Performance</h1>
-  <h2>Introduction</h2>
-  <p>
-    On the Google's PageSpeed mailing list, there was recently a 
-    <a href="https://groups.google.com/d/msg/page-speed-discuss/1cRCzYwrc0E/XKimQ4dOupMJ">
-      question raised regarding the benefits of gzip</a>. Specifically,
-    the rightly curious individual wanted specific numbers regarding the 
-    benefits of gzip. While I responded confidently that gzip would improve 
-    page performance, I discovered that I could not easily find any recent 
-    information to back up my claim.
-  </p>
-  <p>
-    And thus, I did the only logical thing: I created the data myself. I 
-    downloaded CSV of <a href="http://www.alexa.com/topsites">Alexa's top
-      one million</a> sites and plugged them into a script that downloaded
-    and decompressed each page, timing my computer as it went. What follows
-    is an explanation of the results and some spiffy interactive graphs to
-    match.
-  </p>
-  <p>
-    For the impatient, you can skip straight to the conclusion: 
-    <a href="#conclusion">gzip is a very good thing</a>.
-  </p>
-  <h2>gzip's Traditional Savings: Bytes on the Wire</h2>
-  <p>
-    Usually, when people think of "zipping" up their content, they're 
-    considering how much smaller the content becomes as a result of 
-    compression. If you can compress a 100MB file into a 1MB file, it should
-    download 100 times as quickly, or so goes the thinking.
-  </p>
-  <figure class="thumbnail">
-    <compression-ratio-visual class="visual" data="data" animation-duration="animation_duration" width="690" height="200"></compression-ratio-visual>
-    <figcaption>
-      Most content compresses to between 15% and 35% of its original size.
-    </figcaption>
-  </figure>
-  <p>
-    Looking at the histogram for the homepages of our sample sites, we can see 
-    most pages are compressed to between 15% and 35% of their original size. 
-    That's pretty good. For all of the sampled pages, that corresponds to 
-    roughly 65MB of data saved.
-  </p>
-  <p>
-    But already, this thinking is flawed. For isntance,t he advertised level of
-    bandwidth offered at one of my local ISPs is 50Mbps. That's close to 6
-    megabytes per second. If it were that simple, then we could expect to 
-    download the largest sampled page, sina.com.cn, uncompressed in roughly a 
-    tenth of a second. The average page, clocking in at 101KB, would take closer
-    to a hundredth of a second. And yet, we know from experience that this is
-    not the case. Why?
-  </p>
-  <h2>Enter TCP Slow-start</h2>
-  <p>
-    The villain in this case is something known as 
-    <a href="http://en.wikipedia.org/wiki/Slow-start">TCP Slow-start</a>. I use 
-    the term "villain" lightly here because it is actually a very useful 
-    mechanism for general internet traffic. It prevents competing streams of 
-    data from stomping all over reach other and mucking up the internet for
-    everyone. The problem is that slow-start does not work well for small
-    data payloads such as HTML.
-  </p>
-  <p>
-    The basic mechanism for slow start goes as such: send a small amount of 
-    data. If that goes smoothly, send a little more data than before. Keep doing
-    this until data starts getting lost. Back up and restart the process, 
-    starting with the data that got lost. This generally works well when one 
-    needs to send a large amount of data: you ramp up the amount of data that
-    you're sending and then hover on or around that point until you've sent all
-    of your data. When working with large amounts of data, this ramp up occurs
-    quickly. The few extra round trips that are incurred at the beginning
-    are inconsequential relative to the total send time for the payload.
-  </p>
-  <p>
-    And yet, for small data payloads, much of this extra caution is expensive.
-    Most computer systems will start out only sending 2, 3 or 10 "packets" of
-    data before pausing. For reference, 10 packets is approximately 14KB of 
-    data. Thus, a 15KB file that fits into 11 packets is being broken up into 2
-    separate chunks of packets. The second chunk has to wait on the first to
-    finish before it can be sent. Even on a fast connection, it can take 20ms
-    or so for all the packets in the first chunk to be "ACK'ed". Suddenly, a
-    tiny 15KB file that should transfer in 2ms on our super-fast data connection
-    is taking ten times as long!
-  </p>
-  <p>
-    These "chunks" as I have referred to them are what's known as a 
-    "congestion window", CWND for short. Whereas a packet of data represents
-    a set of bits, a CWND represents a set of packets. Slow-start is the 
-    mechanism that controls the size and growth of the CWND. As referenced 
-    before, the initial congestion (ICWND) starts small and grows over time.
-  </p>
-  <figure class="thumbnail">
-    <icw-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt" animation-duration="animation_duration" width="690" height="200"></icw-visual>
-  </figure>
-  <form name="tcp_controls" class="tcp-controls well">
-   <label>
-      ICWND (packets):
-      <input name="icw" type="number" ng-model="icw" min="1" ng-pattern="/^\d+$/" />
-    </label>
-    <label>
-      Max CWND (packets):
-      <input name="maxcw" type="number" ng-model="max_cw" min="1" ng-pattern="/^\d+$/" />
-    </label>
-    <label>
-      SSThresh (packets):
-      <input name="sshthresh" type="number" ng-model="ssthresh" min="1" ng-pattern="/^\d+$/" />
-    </label>
-    <label>
-      MTU (bytes):
-      <input name="mtu" type="number" ng-model="mtu" min="1" ng-pattern="/^\d+$/" />
-    </label>
-   <label>
-      RTT (ms):
-      <input name="rtt" type="number" ng-model="rtt" min="1" ng-pattern="/^\d+$/" />
-    </label>
-  </form>
-  <decompress-time-visual data="data" animation-duration="animation_duration" width="520" height="200"></decompress-time-visual>
-  <seconds-saved-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt" animation-duration="animation_duration" width="520" height="200"></seconds-saved-visual>
+        <h1>Quantifying gzip's Impact on Web Performance</h1>
+        <h2>Introduction</h2>
+        <p>
+          On the Google's PageSpeed mailing list, there was recently a 
+          <a href="https://groups.google.com/d/msg/page-speed-discuss/1cRCzYwrc0E/XKimQ4dOupMJ">
+            question raised regarding the benefits of gzip</a>. Specifically,
+          the rightly curious individual wanted specific numbers regarding the 
+          costs of associated with compressed content. While I responded 
+          confidently that gzip would improve page performance, I discovered 
+          that I could not easily find any recent information to back up my 
+          claim.
+        </p>
+        <p>
+          And thus, I did the only logical thing: I collected the data myself. I 
+          downloaded CSV of <a href="http://www.alexa.com/topsites">Alexa's top
+            one million</a> sites and plugged them into a script that downloaded
+          and decompressed each page, timing the decompression as it went. What 
+          follows is an explanation of the results and some spiffy interactive 
+          graphs to match.
+        </p>
+        <p>
+          For the impatient, you can skip straight to the conclusion: 
+          <a href="#conclusion">gzip is a very good thing</a>.
+        </p>
+        <h2>gzip's Traditional Savings: Bytes on the Wire</h2>
+        <p>
+          Usually, when people think of "zipping" up their content, they're 
+          considering how much smaller the content becomes as a result of 
+          compression. If you can compress a 100MB file into a 1MB file, it 
+          should download 100 times as quickly, or so goes the thinking.
+        </p>
+        <figure class="thumbnail">
+          <compression-ratio-visual class="visual" data="data" animation-duration="animation_duration" width="690" height="200"></compression-ratio-visual>
+          <figcaption>
+            Most sampled pages compresses to between 15% and 35% of its original
+            size.
+          </figcaption>
+        </figure>
+        <p>
+          Looking at the histogram for the homepages of our sample sites, we can 
+          see most pages are compressed to between 15% and 35% of their original 
+          size. That's pretty good. For all of the sampled pages, that 
+          corresponds to roughly 65MB of data saved.
+        </p>
+        <p>
+          But already, this thinking is flawed. For instance, the advertised level of
+          bandwidth offered at one of my local ISPs is 50Mbps. That's close to 6
+          megabytes per second. If it were that simple, then we could expect to 
+          download the largest sampled page, sina.com.cn, uncompressed in roughly a 
+          tenth of a second. The average page, clocking in at 101KB, would take closer
+          to a hundredth of a second. And yet, we know from experience that this is
+          not the case. Why?
+        </p>
+        <h2>Enter TCP Slow-start</h2>
+        <p>
+          The villain in this case is something known as 
+          <a href="http://en.wikipedia.org/wiki/Slow-start">TCP Slow-start</a>. I use 
+          the term "villain" lightly here because it is actually a very useful 
+          mechanism for general internet traffic. It prevents competing streams of 
+          data from stomping all over reach other and mucking up the internet for
+          everyone. The problem is that slow-start does not work well for small
+          data payloads such as HTML.
+        </p>
+        <p>
+          The basic mechanism for slow start goes as such: send a small amount of 
+          data. If that goes smoothly, send a little more data than before. Keep doing
+          this until either everything has been sent or data starts getting lost. When
+          data is lost, back up and restart the process, starting with the data that 
+          was lost. This generally works well when one needs to send a large amount of
+          data: you ramp up the amount of data that you're sending and then hover on 
+          or around the maximum sending size until you've sent all of your data. When
+          working with large amounts of data, this ramp up occurs quickly. The few 
+          extra round trips that are incurred at the beginning are inconsequential 
+          relative to the total send time for the payload.
+        </p>
+        <p>
+          And yet, for small data payloads, much of this extra caution is expensive.
+          Most computer systems will start out only sending 2, 3 or 10 "packets" of
+          data before pausing. For reference, 10 packets is approximately 14KB of 
+          data. Thus, a 15KB file that fits into 11 packets is broken up into 2
+          separate chunks of packets. The second chunk has to wait on the first to
+          finish before it can be sent. Even on a fast connection, it can take 20ms
+          or so for all the packets in the first chunk to be "ACK'ed". Suddenly, a
+          tiny 15KB file that should transfer in 2ms on our super-fast data connection
+          is taking ten times as long. And 20ms is quite good; it is common to see
+          RTTs of 30 to 60ms.
+        </p>
+        <p>
+          These "chunks" as I have referred to them are what's known as a 
+          "congestion window", CWND for short. Whereas a packet of data represents
+          a set of bits, a CWND represents a set of packets. Slow-start is the 
+          mechanism that controls the size and growth of the CWND. As referenced 
+          before, the initial congestion (ICWND) starts small and grows over time.
+        </p>
+        <p>
+          A full overview of how TCP slow-start works would require an article in and 
+          of itself. Maybe I'll write that article some day, but for now, enough with
+          the words, let's see some pictures!
+        </p>
+        <h2>gzip to the Rescue</h2>
+        <figure class="thumbnail">
+          <icw-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt" animation-duration="animation_duration" width="690" height="200"></icw-visual>
+          <figcaption>
+            A visualization of the congestion window and download time for the
+            largest page sampled. Use the contols below to see how different 
+            parameters affect the TCP pattern.
+          </figcaption>
+        </figure>
+        <form name="tcp_controls" class="tcp-controls well">
+         <label>
+            ICWND (packets):
+            <input name="icw" type="number" ng-model="icw" min="1" ng-pattern="/^\d+$/" />
+          </label>
+          <label>
+            Max CWND (packets):
+            <input name="maxcw" type="number" ng-model="max_cw" min="1" ng-pattern="/^\d+$/" />
+          </label>
+          <label>
+            SSThresh (packets):
+            <input name="sshthresh" type="number" ng-model="ssthresh" min="1" ng-pattern="/^\d+$/" />
+          </label>
+          <label>
+            MTU (bytes):
+            <input name="mtu" type="number" ng-model="mtu" min="1" ng-pattern="/^\d+$/" />
+          </label>
+         <label>
+            RTT (ms):
+            <input name="rtt" type="number" ng-model="rtt" min="1" ng-pattern="/^\d+$/" />
+          </label>
+        </form>
+        <figure class="thumbnail">
+          <seconds-saved-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt" animation-duration="animation_duration" width="690" height="200"></seconds-saved-visual>
+          <figcaption>
+            A histogram showing the number of round trips saved by gzip for the 
+            sites sampled. The number at the top shows the number of sites that
+            saved the given number of round trips. Use the controls above to see how
+            different parameters can effect the round trips saved.
+          </figcaption>
+        </figure>
+        <p>
+          The two visuals above should help convey the round trip costs associated
+          with TCP slow-start as well as the savings that gzip provides. By fitting
+          the payload into fewer packets, we reduce the number of round trips that
+          need to occur and thus avoid the associated latency costs.
+        </p>
+        <p>
+          Notices that there is a statistically significant number of sites for which
+          gzip <em>does not</em> appear save any round trips. There are few things to 
+          keep in mind before jumping to conclusions about this apparent anomaly.
+        </p>
+        <p>
+          First, some of the sites scraped returned exceptionally small pages and 
+          should be excluded. Some sites, for instance, returned error pages because
+          the scaper was not logged in or did not have the right cookies set. Still 
+          others simply don't have a proper home page because they are merely CDN's
+          or other non-public facing pages. Pages such as these add noise to the data.
+        </p>
+        <p>
+          Second, even for the rare page where compression doesn't explicitly save a
+          round trip, there are other benefits. Reducing the number of packets sent
+          reduces the risk of encountering packet loss - a very expensive penalty in 
+          terms of the time it takes to recover. Also, while it might not save round
+          trips, it will save bandwidth. ISPs don't charge per CWND, they charge per 
+          byte. If you can cut your bytes in half, you cut your bandwidth costs in 
+          half.
+        </p>
+        <p>
+          Third, and most importantly, just because a page was small for this scrape
+          doesn't mean that it will always be small, especially for dynamically
+          generated pages that can change in size from one request to the next.
+          Nor does it mean that every other page on a site is small. gzip is usually
+          turned on as an all or nothing flag for text content. There's little sense
+          in turning it on selectively for some pages and not for others.
+        </p>
+        <p>
+          Lastly, do not forget that what is shown above is a very idealistic model.
+          Real world results for TCP behavior may vary wildly, both from server to
+          server and connection to connection.
+        </p>
+        <figure class="thumbnail">
+          <decompress-time-visual data="data" animation-duration="animation_duration" width="690" height="200"></decompress-time-visual>
+          <figcaption>
+            A histogram showing the average decompression time for the sites sampled
+            in milliseconds. Most pages take between 0.1 and 0.7 milliseconds. In 
+            other words, it's very fast!
+          </figcaption>
+        </figure>
+        <p>
+          And this brings up back full circle to the <em>costs</em> of using 
+          gzip. As the figure above shows, gzip is cheap. It is generally two 
+          orders of magnitude faster than even a single rtt. Thus, if 
+          compressing your content saves you even a single round trip, it will 
+          easily be worth the expense.
+        </p>
 
-  <h2 id="conclusion">Conclusion</h2>
-  <p>gzip helps. A lot. Use it.</p>
-  <p>
-    Of the sites sampled, one can expect between one and three round trips to 
-    be saved. On mobile devices, decompression takes less than 4ms in the 
-    majority of cases. On mobile devices, where you can easily expect round 
-    trip times of 200ms or more, that can mean a savings in upwards of
-    600ms. That's a very impactful chunk of time.
-  </p>
-  <p>
-    Even on desktops, where rtt's can get closer to 20ms on a good day, you can
-    expect every saved round trip to count. Decompression on desktops is 
-    blazingly fast &mdash; virtually free when compared against the other 
-    bottlenecks involved. You can easily expect to save 100ms or 
-    more on a desktop computer.
-  </p>
+        <h2 id="conclusion">Conclusion</h2>
+        <p>gzip helps. A lot. Use it.</p>
+        <p>
+          Of the sites sampled, one can expect between one and three round trips to 
+          be saved. On mobile devices, decompression takes less than 4ms in the 
+          majority of cases. On mobile devices, where you can easily expect round 
+          trip times of 200ms or more, that can mean a savings in upwards of
+          600ms. That's a very impactful chunk of time.
+        </p>
+        <p>
+          Even on desktops, where rtt's can get closer to 20ms on a good day, you can
+          expect every saved round trip to count. Decompression on desktops is 
+          blazingly fast &mdash; virtually free when compared against the other 
+          bottlenecks involved. You can easily expect to save 100ms or 
+          more on a desktop computer.
+        </p>
       </div>
     </div>
   </div>

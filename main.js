@@ -219,7 +219,7 @@ gzipApp.directive('icwVisual', function() {
 gzipApp.directive('decompressTimeVisual', function() {
   var margins = {
     top: 10,
-    right: 10,
+    right: 30,
     bottom: 30,
     left: 30};
 
@@ -230,8 +230,8 @@ gzipApp.directive('decompressTimeVisual', function() {
       animation_duration: '=animationDuration'
     },
     link: function(scope, element, attrs) {
-      attrs.width = parseInt(attrs.width || 800);
-      attrs.height = parseInt(attrs.height || 200);
+      attrs.width = parseInt(attrs.width || 800) - margins.left - margins.right;
+      attrs.height = parseInt(attrs.height || 200) - margins.top - margins.bottom;
       var chart = d3.select(element[0]).append('svg')
         .attr('class', 'chart')
         .attr('width', attrs.width + margins.left + margins.right)
@@ -366,7 +366,7 @@ gzipApp.directive('compressionRatioVisual', function() {
 gzipApp.directive('secondsSavedVisual', function() {
   var margins = {
     top: 10,
-    right: 10,
+    right: 30,
     bottom: 30,
     left: 30};
 
@@ -382,8 +382,8 @@ gzipApp.directive('secondsSavedVisual', function() {
       animation_duration: '=animationDuration'
     },
     link: function(scope, element, attrs) {
-      attrs.width = parseInt(attrs.width || 800);
-      attrs.height = parseInt(attrs.height || 200);
+      attrs.width = parseInt(attrs.width || 800) - margins.left - margins.right;
+      attrs.height = parseInt(attrs.height || 200) - margins.top - margins.bottom;
       var chart = d3.select(element[0]).append('svg')
         .attr('class', 'chart')
         .attr('width', attrs.width + margins.left + margins.right)
