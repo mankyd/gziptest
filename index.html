@@ -26,6 +26,7 @@
       .area.decompressed { fill: rgb(255, 208, 208); }
       .area-label.gzipped { text-anchor: end; }
       .area-label.decompressed { text-anchor: start; }
+      .average-savings { text-anchor: end; font-size: 16px; baseline-shift: -16px; }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.0.7/angular.min.js"></script>
     <script src="http://d3js.org/d3.v3.js" charset="utf-8"></script>
@@ -199,7 +200,7 @@
           need to occur and thus avoid the associated latency costs.
         </p>
         <p>
-          Notices that there is a statistically significant number of sites for
+          Notice that there is a statistically significant number of sites for
           which gzip <em>does not</em> appear save any round trips. There are a
           few things to keep in mind before jumping to conclusions about this
           apparent anomaly.
@@ -236,7 +237,7 @@
           Real world results for TCP behavior may vary wildly, both from server to
           server and connection to connection. There are 
           <a href="http://en.wikipedia.org/wiki/TCP_congestion_avoidance_algorithm">
-            many algorithms that affect TCP slow-start</a>, and each will change
+            many algorithms that affect TCP slow-start</a> and each will change
           the end result.
         </p>
         <figure class="thumbnail">
@@ -260,16 +261,16 @@
         <p>
           Of the sites sampled, one can expect between one and three round trips to 
           be saved. On mobile devices, decompression takes less than 4ms in the 
-          majority of cases. On mobile devices, where you can easily expect round 
+          majority of cases and on these devices, where you can easily expect round 
           trip times of 200ms or more, that can mean a savings in upwards of
           600ms. That's a very impactful chunk of time.
         </p>
         <p>
-          Even on desktops, where rtt's can get closer to 20ms on a good day, you can
+          Even on desktops, where RTTs can get closer to 20ms on a good day, you can
           expect every saved round trip to count. Decompression on desktops is 
           blazingly fast &mdash; virtually free when compared against the other 
           bottlenecks involved. You can easily expect to save 100ms or 
-          more on a desktop computer.
+          more in common cases.
         </p>
       </div>
     </div>

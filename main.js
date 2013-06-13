@@ -600,6 +600,18 @@ gzipApp.directive('secondsSavedVisual', function() {
         // bars above it.
         x.domain([-.5, d3.max(rtts_saved) + .5]);
         gXaxis.call(xaxis);
+
+        var avg_savings = chart.selectAll('text.average-savings')
+          .data([d3.mean(rtts_saved)]);
+
+        avg_savings.enter().append('text')
+          .attr('class', 'average-savings')
+          .attr('x', attrs.width)
+          .attr('y', margins.top);
+        avg_savings
+          .text(function(d) { 
+            return 'Average RTTs Saved: '+ d3.format('.2f')(d); 
+          });
       };
 
       scope.$watch('max_cw', redraw);
