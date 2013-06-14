@@ -10,8 +10,9 @@
       figure .visual { display: block; }
       figcaption { font-size: 12px; margin: 0 20px 10px; line-height: 15px; }
       p { font-family: "Times New Roman", serif; font-size: 16px; line-height: 22px; margin-bottom: 18px; }
-      .tcp-controls label { display: inline-block; margin-right: 18px; }
-      .tcp-controls input { width: 60px; display: block; }
+      .tcp-controls label { display: inline-block; margin-right: 18px; font-size: 12px; }
+      .tcp-controls input { width: 50px; display: block; }
+      .tcp-controls input[name=num_bytes] { width:90px; }
       a.reference { vertical-align: super; font-size: 12px; }
       svg.chart { font: 10px arial; }
       g.bar rect { fill: rgb(127, 133, 182); shape-rendering: crispEdges; }
@@ -145,12 +146,12 @@
         </p>
         <h2>gzip to the Rescue</h2>
         <figure class="thumbnail">
-          <icw-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt"  congestion-algorithm="congestion_algorithm" animation-duration="animation_duration" width="690" height="200"></icw-visual>
+          <icw-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt"  congestion-algorithm="congestion_algorithm" num_bytes="max_bytes" compression-ratio="compression_ratio" animation-duration="animation_duration" width="690" height="200"></icw-visual>
           <figcaption>
             A visualization of the congestion window and download time for the
             largest page sampled. The area in green represents the time to 
             download the gzipped page. The area in red represents the additional
-            amounnt of time the non-gzipped page would have taken. Use the 
+            amount of time the non-gzipped page would have taken. Use the 
             contols below to see how different parameters affect the TCP
             pattern.
           </figcaption>
@@ -165,10 +166,6 @@
             <input name="maxcw" type="number" ng-model="max_cw" min="1" ng-pattern="/^\d+$/" />
           </label>
           <label>
-            SSThresh (packets):
-            <input name="sshthresh" type="number" ng-model="ssthresh" min="1" ng-pattern="/^\d+$/" />
-          </label>
-          <label>
             MTU (bytes):
             <input name="mtu" type="number" ng-model="mtu" min="1" ng-pattern="/^\d+$/" />
           </label>
@@ -176,11 +173,20 @@
             RTT (ms):
             <input name="rtt" type="number" ng-model="rtt" min="1" ng-pattern="/^\d+$/" />
           </label>
+          <label>
+            Total Bytes:
+            <input name="num_bytes" type="number" ng-model="max_bytes" min="1" ng-pattern="/^\d+$/" />
+          </label>
+          <label>
+            Compression:
+            <input name="compression_ratio" type="number" ng-model="compression_ratio" min=".01" max="1" step=".01" ng-pattern="/^(0?\.\d+)|1$/" />
+          </label>
           <div>
            Congestion Algorithm<a href="http://en.wikipedia.org/wiki/TCP_congestion_avoidance_algorithm#TCP_Tahoe_and_Reno" class="reference" target="_blank">?</a>:
            <div class="btn-group" data-toggle="buttons-radio">
              <button class="btn btn-small" btn-radio="'tahoe'" ng-model="congestion_algorithm">Tahoe</button>
              <button class="btn btn-small" btn-radio="'reno'" ng-model="congestion_algorithm">Reno</button>
+             <button class="btn btn-small" btn-radio="'cubic'" ng-model="congestion_algorithm">CUBIC</button>
            </div>
           </div>
         </form>

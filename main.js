@@ -3,10 +3,11 @@ gzipApp.controller('GzipCtrl', function AppCtrl ($scope) {
   $scope.max_cw = 64;
   $scope.icw = 10;
   $scope.animation_duration = 200;
-  $scope.ssthresh = 42;
   $scope.mtu = 1400;
   $scope.rtt = 50;
   $scope.congestion_algorithm = 'tahoe';
+  $scope.max_bytes = 1024*1024;
+  $scope.compression_ratio = .21;
   d3.csv('results.csv', function(d) {
     return {url: d.url,
             compressed_size: parseInt(d.compressed_size),
@@ -16,75 +17,133 @@ gzipApp.controller('GzipCtrl', function AppCtrl ($scope) {
            };
   }, function(data) {
     $scope.data = data;
+    $scope.max_bytes = d3.max(data, 
+                              function(d) { return d.decompressed_size; });
+    $scope.compression_ratio = Math.round(d3.max(
+        data, 
+        function(d) { return d.compressed_size; }) / $scope.max_bytes * 100) / 100;
     $scope.$digest();
   });
 });
 
-var TCPTahoe = function(icw, max_cw, ssthresh, mtu, num_bytes) {
-  // a idealistic model of tcp's tahoe slow start
-  var cw = icw;
-  var cw_data = [];
-  // put zero on the front so that we can creating a running sum.
-  // take the 0 off before returning.
-  var packets_transmitted = [0];
+var CONGESTION_ALGORITHMS = {
+  tahoe: function(icw, max_cw, mtu, rtt, num_bytes) {
+    // a idealistic model of tcp's tahoe slow start
+    var cw = icw;
+    var cw_data = [];
+    // put zero on the front so that we can creating a running sum.
+    // take the 0 off before returning.
+    var packets_transmitted = [0];
+    var ssthresh = null;
 
-  while (num_bytes > 0) {
-    // record this rtt
-    cw_data.push(cw);
-    packets_transmitted.push(
-        packets_transmitted[packets_transmitted.length-1] + cw);
-    num_bytes -= cw * mtu;
+    while (num_bytes > 0) {
+      // record this rtt
+      cw_data.push(cw);
+      if (cw <= max_cw) {
+        packets_transmitted.push(
+            packets_transmitted[packets_transmitted.length - 1] + cw);
+        num_bytes -= cw * mtu;
 
-    // congestion avoidance
-    if (cw >= ssthresh) {
-      cw += 1;
-    }
-    // slow start
-    else {
-      cw *= 2;
-      if (cw > ssthresh) {
-        cw = ssthresh;
+        // congestion avoidance
+        if (ssthresh !== null && cw >= ssthresh) {
+          cw += 1;
+        }
+        // slow start
+        else {
+          cw *= 2;
+          if (ssthresh !== null && cw > ssthresh) {
+            cw = ssthresh;
+          }
+        }
+      }
+      else {
+        // loss occured. no packets sent this rtt.
+        packets_transmitted.push(
+            packets_transmitted[packets_transmitted.length - 1]);
+        ssthresh = Math.floor(cw / 2);
+        cw = Math.max(1, Math.min(icw, ssthresh));
       }
     }
-    // experiencing packet loss.
-    if (cw > max_cw){
-      // TODO(mankoff): packet loss. insert an extra, 0-packet rtt here? maybe more?
-      ssthresh = Math.floor(cw / 2);
-      cw = icw;
-    }
-  }
-  packets_transmitted.shift();
-  return [cw_data,  packets_transmitted];
-}
+    packets_transmitted.shift();
+    return [cw_data,  packets_transmitted];
+  },
+  reno : function(icw, max_cw, mtu, rtt, num_bytes) {
+    // a idealistic model of tcp slow start
+    var cw = icw;
+    var cw_data = [];
+    var packet_data = [0];
+    var loss_occured = false;
 
-var TCPReno = function(icw, max_cw, ssthresh, mtu, num_bytes) {
-  // a theoretical model of tcp slow start
-  var cw = icw;
-  var cw_data = [];
-  var packet_data = [0];
+    while (num_bytes > 0) {
+      cw_data.push(cw);
+      if (cw <= max_cw) {
+        packet_data.push(packet_data[packet_data.length-1] + cw);
+        num_bytes -= cw * mtu;
 
-  while (num_bytes > 0) {
-    cw_data.push(cw);
-    packet_data.push(packet_data[packet_data.length-1] + cw);
-
-    num_bytes -= cw * mtu;
-    if (cw >= ssthresh) {
-      cw += 1;
-    }
-    else {
-      cw *= 2;
-      if (cw > ssthresh) {
-        cw = ssthresh;
+        if (loss_occured) {
+          cw += 1;
+        }
+        else {
+          cw *= 2;
+        }
+      }
+      else {
+        packet_data.push(packet_data[packet_data.length-1]);
+        loss_occured = true;
+        cw = Math.max(1, Math.floor(cw / 2));
       }
     }
-    if (cw > max_cw){
-      ssthresh = Math.floor(cw / 2);
-      cw = ssthresh + 1;
+    packet_data.shift();
+    return [cw_data, packet_data];
+  },
+
+  cubic: function(icw, max_cw, mtu, rtt, num_bytes) {
+    // a idealistic model of tcp slow start
+    // http://www4.ncsu.edu/~rhee/export/bitcp/cubic-paper.pdf
+    // http://tools.ietf.org/id/draft-rhee-tcpm-cubic-02.txt
+    var cw = icw;
+    var cw_data = [];
+    var packet_data = [0];
+    var c = 0.4;
+    var b = 0.2;
+    var t = null;
+    var wmax = null; // wmax is different than cw_max in that wmax is the largest
+    // window that we've experienced, whereas max_cw is the 
+    // largest theoretical window that we can experience.
+    var reno_cw = cw;
+
+    while (num_bytes > 0) {
+      cw_data.push(cw);
+      if (cw <= max_cw) {
+        packet_data.push(packet_data[packet_data.length - 1] + cw);
+        num_bytes -= cw * mtu;
+        if (wmax === null) { // no loss yet
+          cw *= 2;
+          reno_cw = cw;
+        }
+        else {
+          // t is in milliseconds, but needs to be converted to seconds.
+          cw = Math.floor(c * Math.pow(t / 1000 - Math.pow(wmax * b / c, 1/3), 3) + wmax);
+          // choose between cubic and reno
+          reno_cw += 1;
+          cw = Math.max(1, Math.max(cw, reno_cw));
+          t += rtt;
+        }
+      }
+      else {
+        // loss occured. no packets were sent this rtt.
+        packet_data.push(packet_data[packet_data.length - 1]);
+        t = 0;
+        wmax = cw;
+        reno_cw = Math.floor(cw / 2);
+        cw = Math.floor(cw * (1 - b));
+      }
+
     }
+    packet_data.shift();
+    return [cw_data, packet_data];
   }
-  packet_data.shift();
-  return [cw_data, packet_data];
-}
+};
 
 gzipApp.directive('icwVisual', function() {
   var margins = {
@@ -99,9 +158,10 @@ gzipApp.directive('icwVisual', function() {
       data: '=',
       max_cw: '=maxCw',
       icw: '=',
-      ssthresh: '=',
       mtu: '=',
       rtt: '=',
+      num_bytes: '=numBytes',
+      compression_ratio: '=compressionRatio',
       congestion_algorithm: '=congestionAlgorithm',
       animation_duration: '=animationDuration'
     },
@@ -161,22 +221,19 @@ gzipApp.directive('icwVisual', function() {
         .attr('dy', -30);
 
       var redraw = function() {
-        if (!scope.data) {
+        if (!scope.data || !scope.icw || !scope.max_cw || !scope.mtu || 
+            !scope.rtt || !scope.num_bytes || ! scope.compression_ratio) {
           return;
         }
 
-        var congestion_algorithm = TCPTahoe;
-        switch(scope.congestion_algorithm) {
-        case 'reno':
-          congestion_algorithm = TCPReno;
-          break;
+        var congestion_algorithm = CONGESTION_ALGORITHMS.tahoe;
+        if (scope.congestion_algorithm in CONGESTION_ALGORITHMS) {
+          congestion_algorithm = CONGESTION_ALGORITHMS[scope.congestion_algorithm];
         }
         var decompressed_tcp_data = congestion_algorithm(
-            scope.icw, scope.max_cw, scope.ssthresh, scope.mtu, 
-            d3.max(scope.data, function(d) { return d.decompressed_size; }));
+            scope.icw, scope.max_cw, scope.mtu, scope.rtt, scope.num_bytes);
         var compressed_tcp_data = congestion_algorithm(
-            scope.icw, scope.max_cw, scope.ssthresh, scope.mtu, 
-            d3.max(scope.data, function(d) { return d.compressed_size; }));
+            scope.icw, scope.max_cw, scope.mtu, scope.rtt, scope.num_bytes * scope.compression_ratio);
 
         var cw_data = decompressed_tcp_data[0];
         var decompressed_data = decompressed_tcp_data[1];
@@ -249,7 +306,6 @@ gzipApp.directive('icwVisual', function() {
           .attr('d', function(d) { return d.line_gen(d.data); });
         path.exit().remove();
 
-
         var area_labels = chart.selectAll('text.area-label')
           .data([
             {
@@ -287,7 +343,7 @@ gzipApp.directive('icwVisual', function() {
               css_class: 'packets',
               label: 'Total Packets Sent',
               path_id: 'packet-path',
-              dx: 200
+              dx: 400
             }]);
 
         path_labels.enter().append('text')
@@ -323,7 +379,7 @@ gzipApp.directive('icwVisual', function() {
 
         cw_packets_axis
           .transition().duration(scope.animation_duration)
-            .call(d3.svg.axis().scale(cw_y).orient('left'));
+              .call(d3.svg.axis().scale(cw_y).orient('left'));
 
         total_packets_axis
           .transition().duration(scope.animation_duration)
@@ -334,9 +390,10 @@ gzipApp.directive('icwVisual', function() {
       scope.$watch('icw', redraw);
       scope.$watch('data', redraw);
       scope.$watch('mtu', redraw);
-      scope.$watch('ssthresh', redraw);
       scope.$watch('rtt', redraw);
+      scope.$watch('num_bytes', redraw);
       scope.$watch('congestion_algorithm', redraw);
+      scope.$watch('compression_ratio', redraw);
     }
   };
 });
@@ -375,7 +432,6 @@ gzipApp.directive('decompressTimeVisual', function() {
         if (!scope.data) {
           return;
         }
-
         var x = d3.scale.linear()
           .domain([0, d3.max(scope.data, function(d) { return d.time; })])
           .range([0, attrs.width]);
@@ -503,7 +559,6 @@ gzipApp.directive('secondsSavedVisual', function() {
       max_cw: '=maxCw',
       icw: '=',
       mtu: '=',
-      ssthresh: '=',
       rtt: '=',
       congestion_algorithm: '=congestionAlgorithm',
       animation_duration: '=animationDuration'
@@ -531,25 +586,24 @@ gzipApp.directive('secondsSavedVisual', function() {
       var xaxis = d3.svg.axis().scale(x).tickSize(6,0).orient('bottom');
 
       var redraw = function() {
-        if (!scope.data) {
+        if (!scope.data || !scope.icw || !scope.max_cw || !scope.mtu || 
+            !scope.rtt) {
           return;
         }
 
-        var congestion_algorithm = TCPTahoe;
-        switch(scope.congestion_algorithm) {
-        case 'reno':
-          congestion_algorithm = TCPReno;
-          break;
+        var congestion_algorithm = CONGESTION_ALGORITHMS.tahoe;
+        if (scope.congestion_algorithm in CONGESTION_ALGORITHMS) {
+          congestion_algorithm = CONGESTION_ALGORITHMS[scope.congestion_algorithm];
         }
         var rtts_saved = [];
         var i;
         for (i = 0; i < scope.data.length; i++) {
           var decompressed_windows = congestion_algorithm(
-            scope.icw, scope.max_cw, scope.ssthresh, scope.mtu, 
+            scope.icw, scope.max_cw, scope.mtu, scope.rtt,
             scope.data[i].decompressed_size)[0].length;
           var compressed_windows = congestion_algorithm(
-              scope.icw, scope.max_cw, scope.ssthresh, scope.mtu, 
-              scope.data[i].compressed_size)[0].length;
+            scope.icw, scope.max_cw, scope.mtu, scope.rtt,
+            scope.data[i].compressed_size)[0].length;
           rtts_saved.push(decompressed_windows - compressed_windows);
         }
 
@@ -618,7 +672,6 @@ gzipApp.directive('secondsSavedVisual', function() {
       scope.$watch('icw', redraw);
       scope.$watch('data', redraw);
       scope.$watch('mtu', redraw);
-      scope.$watch('ssthresh', redraw);
       scope.$watch('rtt', redraw);
       scope.$watch('congestion_algorithm', redraw);
     }
