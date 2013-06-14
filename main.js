@@ -628,32 +628,45 @@ gzipApp.directive('secondsSavedVisual', function() {
         var bars = chart.selectAll('.bar')
           .data(hist);
         var bars_enter = bars.enter().append('g')
-            .attr('class', 'bar');
+            .attr('class', 'bar')
+            .attr('transform', function(d) { return 'translate('+ x(d.x) + ',' + y(d.y) + ')'; });
 
-        bars_enter.append('rect');
-        bars_enter.append('text');
-
-        bars
-          .attr('transform', function(d) { return 'translate('+ x(d.x) + ',' + y(d.y) + ')'; });
-
-        bars.select('rect')
+        bars_enter.append('rect')
           .attr('x', 0)
           .attr('width', x(hist[0].dx) - 1)
           .attr('height', function(d) { return attrs.height - y(d.y); });
 
-        bars.select('text')
+        bars_enter.append('text')
+          .attr('dy', '-.75em')
+          .attr('y', 6)
+          .attr('x', x(hist[0].dx) / 2)
+          .attr('opacity', 0)
+          .attr('text-anchor', 'middle')
+          .text(function(d) { return d.y; });
+
+        bars.transition().duration(scope.animation_duration)
+          .attr('transform', function(d) { return 'translate('+ x(d.x) + ',' + y(d.y) + ')'; });
+
+        bars.select('rect').transition().duration(scope.animation_duration)
+          .attr('x', 0)
+          .attr('width', x(hist[0].dx) - 1)
+          .attr('height', function(d) { return attrs.height - y(d.y); });
+
+        bars.select('text').transition().duration(scope.animation_duration)
           .attr('dy', '-.75em')
           .attr('y', 6)
           .attr('x', x(hist[0].dx) / 2)
           .attr('text-anchor', 'middle')
-              .text(function(d) { return d.y; });
+          .text(function(d) { return d.y; })
+          .attr('opacity', 1);
 
         bars.exit().remove();
 
         // readjust our x-scale so that it lines up with the center of the
         // bars above it.
         x.domain([-.5, d3.max(rtts_saved) + .5]);
-        gXaxis.call(xaxis);
+        gXaxis.transition().duration(scope.animation_duration)
+          .call(xaxis);
 
         var avg_savings = chart.selectAll('text.average-savings')
           .data([d3.mean(rtts_saved)]);
