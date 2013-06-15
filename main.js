@@ -233,11 +233,17 @@ gzipApp.directive('icwVisual', function() {
         var decompressed_tcp_data = congestion_algorithm(
             scope.icw, scope.max_cw, scope.mtu, scope.rtt, scope.num_bytes);
         var compressed_tcp_data = congestion_algorithm(
-            scope.icw, scope.max_cw, scope.mtu, scope.rtt, scope.num_bytes * scope.compression_ratio);
+            scope.icw, scope.max_cw, scope.mtu, scope.rtt, 
+            scope.num_bytes * scope.compression_ratio);
 
         var cw_data = decompressed_tcp_data[0];
         var decompressed_data = decompressed_tcp_data[1];
         var compressed_data = compressed_tcp_data[1];
+
+        if (cw_data.length === 1) { // got it all in one cwnd
+          cw_data[1] = cw_data[0];
+          decompressed_data[1] = decompressed_data[0];
+        }
 
         var x = d3.scale.linear()
           .domain([0, cw_data.length - 1])
