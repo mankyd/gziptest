@@ -518,7 +518,9 @@ gzipApp.directive('decompressTimeVisual', function() {
             .attr('x', function(d) { return x(d.x + d.dx/2); })
             .text(function(d) { if (d.y === 0) { return ''; } return d.y; });
 
-        xaxis.call(d3.svg.axis().scale(x).orient('bottom'));
+        xaxis.call(
+          d3.svg.axis().scale(x).orient('bottom')
+          .tickFormat(function(d) { return d + 'ms';}));
       };
 
       scope.$watch('data_desktop', redraw);

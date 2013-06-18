@@ -84,34 +84,37 @@
           corresponds to roughly 65MB of data saved.
         </p>
         <p>
-          But already, this thinking is flawed. For instance, the advertised level of
-          bandwidth offered at one of my local ISPs is 50Mbps. That's close to 6
-          megabytes per second. If it were that simple, then we could expect to 
-          download the largest sampled page, sina.com.cn, uncompressed in roughly a 
-          tenth of a second. The average page, clocking in at 101KB, would take closer
-          to a hundredth of a second. And yet, we know from experience that this is
-          not the case. Why?
+          But already, this thinking is flawed. For instance, the advertised
+          level of bandwidth offered at one of my local ISPs is 50Mbps. That's 
+          close to 6 megabytes per second. If it were that simple, then we could
+          expect to download the largest sampled page, sina.com.cn, 
+          <em>uncompressed</em> in roughly a tenth of a second. The average
+          page, clocking in at 101KB, would take closer to a hundredth of a 
+          second. And yet, we know from experience that this is not the case.
+          Why?
         </p>
         <h2>Enter TCP Slow-start</h2>
         <p>
           The villain in this case is something known as 
-          <a href="http://en.wikipedia.org/wiki/Slow-start">TCP Slow-start</a>. I use 
-          the term "villain" lightly here because it is actually a very useful 
-          mechanism for general internet traffic. It prevents competing streams of 
-          data from stomping all over reach other and mucking up the internet for
-          everyone. The problem is that slow-start does not work well for small
-          data payloads such as HTML.
+          <a href="http://en.wikipedia.org/wiki/Slow-start">TCP Slow-start</a>.
+          I use the term "villain" lightly here because it is actually a very
+          useful mechanism for general internet traffic. It prevents competing
+          streams of data from stomping all over reach other and mucking up the
+          internet for everyone. The problem is that slow-start, relative to
+          their size, the costs, in terms of wall-clock time, is quite high for
+          small data payloads such as HTML and other web content.
         </p>
         <p>
-          The basic mechanism for slow start goes as such: send a small amount of 
-          data. If that goes smoothly, send a little more data than before. Keep doing
-          this until either everything has been sent or data starts getting lost. When
-          data is lost, back up and restart the process, starting with the data that 
-          was lost. This generally works well when one needs to send a large amount of
-          data: you ramp up the amount of data that you're sending and then hover on 
-          or around the maximum sending size until you've sent all of your data. When
-          working with large amounts of data, this ramp up occurs quickly. The few 
-          extra round trips that are incurred at the beginning are inconsequential 
+          The basic mechanism for slow start goes as such: send a small amount
+          of data. If that goes smoothly, send a little more data than before.
+          Keep doing this until either everything has been sent or data starts 
+          getting lost. When data is lost, back up and restart the process, 
+          starting with the data that was lost. This generally works well when
+          one needs to send a large amount of data: you ramp up the amount of 
+          data that you're sending and then hover on or around the maximum 
+          sending size until you've sent all of your data. When working with 
+          large amounts of data, this ramp up occurs quickly. The few extra 
+          round trips that are incurred at the beginning are inconsequential 
           relative to the total send time for the payload.
         </p>
         <p>
@@ -124,7 +127,7 @@
           on a fast connection, it can take 20ms or so for all the packets in 
           the first chunk to be "ACK'ed". Suddenly, a tiny 15KB file that should
           transfer in 2ms on our super-fast data connection is taking ten times 
-          as long. And 20ms is on the optimistic side; it is common to see RTTs 
+          as long. And 20ms is on the optimistic side; it is common to see RTT's 
           of 30 to 60ms. For international communication, you can have RTTs in 
           the hundreds. (A quick test of baidu.com gives me a 600ms average!)
         </p>
@@ -196,15 +199,16 @@
           <figcaption>
             A histogram showing the number of round trips saved by gzip for the 
             sites sampled. The number at the top shows the number of sites that
-            saved the given number of round trips. Use the controls above to see how
-            different parameters can affect the round trips saved.
+            saved the given number of round trips. Use the controls above to see
+            how different parameters can affect the round trips saved.
           </figcaption>
         </figure>
         <p>
-          The two visuals above should help convey the round trip costs associated
-          with TCP slow-start as well as the savings that gzip provides. By fitting
-          the payload into fewer packets, we reduce the number of round trips that
-          need to occur and thus avoid the associated latency costs.
+          The two visuals above should help convey the round trip costs 
+          associated with TCP slow-start as well as the savings that gzip
+          provides. By fitting the payload into fewer packets, we reduce the 
+          number of round trips that need to occur and thus avoid the associated
+          latency costs.
         </p>
         <p>
           Notice that there is a statistically significant number of sites for
@@ -223,26 +227,27 @@
           of the web was taken.
         </p>
         <p>
-          Second, even for the rare page where compression doesn't explicitly save a
-          round trip, there are other benefits. Reducing the number of packets sent
-          reduces the risk of encountering packet loss - a very expensive penalty in 
-          terms of the time it takes to recover. Also, while it might not save round
-          trips, it will save bandwidth. ISPs don't charge per CWND, they charge per 
-          byte. If you can cut your bytes in half, you cut your bandwidth costs in 
-          half.
+          Second, even for the rare page where compression doesn't explicitly 
+          save a round trip, there are other benefits. Reducing the number of
+          packets sent reduces the risk of encountering packet loss - a very
+          expensive penalty in terms of the time it takes to recover. Also, 
+          while it might not save round trips, it will save bandwidth. ISPs
+          don't charge per CWND, they charge per byte. If you can cut your bytes
+          in half, you cut your bandwidth costs in half.
         </p>
         <p>
-          Third, and most importantly, just because a page was small for this scrape
-          doesn't mean that it will always be small, especially for dynamically
-          generated pages that can change in size from one request to the next.
-          Nor does it mean that every other page on a site is small. gzip is usually
-          turned on as an all or nothing flag for text content. There's little sense
-          in turning it on selectively for some pages and not for others.
+          Third, and most importantly, just because a page was small for this 
+          scrape doesn't mean that it will always be small, especially for 
+          dynamically generated pages that can change in size from one request 
+          to the next. Nor does it mean that every other page on a site is small
+          (I only sampled homepages). gzip is usually turned on as an all or
+          nothing flag for text content. There's little sense in turning it on 
+          selectively for some pages and not for others.
         </p>
         <p>
-          Lastly, do not forget that what is shown above is a very idealistic model.
-          Real world results for TCP behavior may vary wildly, both from server to
-          server and connection to connection. There are 
+          Lastly, do not forget that what is shown above is a very optimistic
+          model. Real world results for TCP behavior may vary wildly, both from 
+          server to server and connection to connection. There are 
           <a href="http://en.wikipedia.org/wiki/TCP_congestion_avoidance_algorithm">
             many algorithms that affect TCP slow-start</a> and each will change
           the end result.
@@ -269,17 +274,17 @@
         <h2 id="conclusion">Conclusion</h2>
         <p>gzip helps. A lot. Use it.</p>
         <p>
-          Of the sites sampled, one can expect between one and three round trips to 
-          be saved. On mobile devices, decompression takes less than 4ms in the 
-          majority of cases and on these devices, where you can easily expect round 
-          trip times of 200ms or more, that can mean a savings in upwards of
-          600ms. That's a very impactful chunk of time.
+          Of the sites sampled, one can expect between one and three round trips
+          to be saved. On mobile devices, decompression takes less than 4ms in 
+          the majority of cases and on these devices, where you can easily 
+          expect round trip times of 200ms or more, that can mean a savings in 
+          upwards of 600ms. That's a very impactful chunk of time.
         </p>
         <p>
-          Even on desktops, where RTTs can get closer to 20ms on a good day, you can
-          expect every saved round trip to count. Decompression on desktops is 
-          blazingly fast &mdash; virtually free when compared against the other 
-          bottlenecks involved. You can easily expect to save 100ms or 
+          Even on desktops, where RTTs can get closer to 20ms on a good day, you
+          can expect every saved round trip to count. Decompression on desktops
+          is blazingly fast &mdash; virtually free when compared against the 
+          other bottlenecks involved. You can easily expect to save 100ms or 
           more in common cases.
         </p>
       </div>
