@@ -15,8 +15,9 @@
       .tcp-controls input[name=num_bytes] { width:90px; }
       a.reference { vertical-align: super; font-size: 12px; }
       svg.chart { font: 10px arial; }
-      g.bar rect { fill: rgb(127, 133, 182); shape-rendering: crispEdges; }
+      g.legend rect, g.bar rect { fill: rgb(127, 133, 182); shape-rendering: crispEdges; }
       g.bar text { fill: black;  }
+      g.legend g.mobile rect, g.data-set.mobile g.bar rect { fill: rgb(255, 183, 52); }
       .axis path, .axis line { fill: none; stroke: black; shape-rendering: crispEdges; }
       .axis-label { text-anchor: middle; }
       .line { fill: none; stroke-width: 2px; }
@@ -29,8 +30,8 @@
       .area-label.decompressed { text-anchor: start; }
       .average-savings { text-anchor: end; font-size: 16px; baseline-shift: -16px; }
     </style>
-    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.0.7/angular.min.js"></script>
-    <script src="http://d3js.org/d3.v3.js" charset="utf-8"></script>
+    <script src="angular.min.js"></script>
+    <script src="d3.v3.js" charset="utf-8"></script>
     <script src="ui-bootstrap-tpls-0.3.0.min.js"></script>
     <script src="main.js"></script>
   </head>
@@ -70,7 +71,7 @@
           should download 100 times as quickly, or so goes the thinking.
         </p>
         <figure class="thumbnail">
-          <compression-ratio-visual class="visual" data="data" animation-duration="animation_duration" width="690" height="200"></compression-ratio-visual>
+          <compression-ratio-visual class="visual" data="data_desktop" animation-duration="animation_duration" width="690" height="200"></compression-ratio-visual>
           <figcaption>
             Most sampled pages compresses to between 15% and 35% of its original
             size. The average page is compressed to 24.9% of its original size.
@@ -146,7 +147,7 @@
         </p>
         <h2>gzip to the Rescue</h2>
         <figure class="thumbnail">
-          <icw-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt"  congestion-algorithm="congestion_algorithm" num_bytes="max_bytes" compression-ratio="compression_ratio" animation-duration="animation_duration" width="690" height="200"></icw-visual>
+          <icw-visual data="data_desktop" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt"  congestion-algorithm="congestion_algorithm" num_bytes="max_bytes" compression-ratio="compression_ratio" animation-duration="animation_duration" width="690" height="200"></icw-visual>
           <figcaption>
             A visualization of the congestion window and download time for the
             largest page sampled. The area in green represents the time to 
@@ -191,7 +192,7 @@
           </div>
         </form>
         <figure class="thumbnail">
-          <seconds-saved-visual data="data" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt" congestion-algorithm="congestion_algorithm" animation-duration="animation_duration" width="690" height="200"></seconds-saved-visual>
+          <seconds-saved-visual data="data_desktop" max-cw="max_cw" icw="icw" mtu="mtu" ssthresh="ssthresh" rtt="rtt" congestion-algorithm="congestion_algorithm" animation-duration="animation_duration" width="690" height="200"></seconds-saved-visual>
           <figcaption>
             A histogram showing the number of round trips saved by gzip for the 
             sites sampled. The number at the top shows the number of sites that
@@ -247,11 +248,14 @@
           the end result.
         </p>
         <figure class="thumbnail">
-          <decompress-time-visual data="data" animation-duration="animation_duration" width="690" height="200"></decompress-time-visual>
+          <decompress-time-visual data-data-desktop="data_desktop" data-data-mobile="data_mobile" animation-duration="animation_duration" width="690" height="200"></decompress-time-visual>
           <figcaption>
-            A histogram showing the average decompression time for the sites sampled
-            in milliseconds. Most pages take between 0.1 and 0.7 milliseconds. In 
-            other words, it's very fast!
+            A histogram showing the average decompression time for the sites 
+            sampled in milliseconds. On desktop, most pages take between 0.1 and
+            0.7 milliseconds. Mobile is slower in the absolute sense, with most
+            pages completing closer to 2 milliseconds, but the overall savings
+            in terms of round trips is also significantly higher. In other 
+            words, gzip is very fast!
           </figcaption>
         </figure>
         <p>

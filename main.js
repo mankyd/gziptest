@@ -16,12 +16,23 @@ gzipApp.controller('GzipCtrl', function AppCtrl ($scope) {
             time: parseFloat(d.time),
            };
   }, function(data) {
-    $scope.data = data;
+    $scope.data_desktop  = data;
     $scope.max_bytes = d3.max(data, 
                               function(d) { return d.decompressed_size; });
     $scope.compression_ratio = Math.round(d3.max(
         data, 
         function(d) { return d.compressed_size; }) / $scope.max_bytes * 100) / 100;
+    $scope.$digest();
+  });
+  d3.csv('results.mobile.csv', function(d) {
+    return {url: d.url,
+            compressed_size: parseInt(d.compressed_size),
+            decompressed_size: parseInt(d.decompressed_size),
+            ratio: parseInt(d.compressed_size) / parseInt(d.decompressed_size),
+            time: parseFloat(d.time),
+           };
+  }, function(data) {
+    $scope.data_mobile = data;
     $scope.$digest();
   });
 });
@@ -414,7 +425,8 @@ gzipApp.directive('decompressTimeVisual', function() {
   return {
     restrict: 'E',
     scope: {
-      data: '=',
+      data_desktop: '=dataDesktop',
+      data_mobile: '=dataMobile',
       animation_duration: '=animationDuration'
     },
     link: function(scope, element, attrs) {
@@ -434,45 +446,83 @@ gzipApp.directive('decompressTimeVisual', function() {
         .attr('class', 'y axis')
         .attr('transform', 'translate(0,0)');
 
+      var legend = chart.append('g')
+        .attr('class', 'legend')
+        .attr('transform', 'translate(' + (attrs.width - 100) + ', 0)')
+      var labels = legend.selectAll('g.label')
+          .data([{label: 'Desktop', css_class: 'desktop'}, 
+                 {label: 'Mobile', css_class: 'mobile'}])
+          .enter().append('g')
+            .attr('class', function(d) { return 'label ' + d.css_class;})
+            .attr('transform', function(d, i) { return 'translate(0,' + (i * 20) + ')';});
+      labels.append('rect')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('height', 10)
+        .attr('width', 10);
+      labels.append('text')
+        .attr('x', 14)
+        .attr('y', 10)
+        .text(function(d) { return d.label; });
       var redraw = function() {
-        if (!scope.data) {
+        if (!scope.data_desktop || !scope.data_mobile) {
           return;
         }
+
+        var data_merged = scope.data_mobile.concat(scope.data_desktop);
+
         var x = d3.scale.linear()
-          .domain([0, d3.max(scope.data, function(d) { return d.time; })])
+          .domain([0, d3.max(data_merged, function(d) { return d.time; })])
           .range([0, attrs.width]);
 
         var hist = d3.layout.histogram()
           .value(function(d) { return d.time; })
-          .bins(x.ticks(50))
-        (scope.data);
+          .range([d3.min(data_merged, function(d) { return d.time; }), d3.max(data_merged, function(d) { return d.time; })])
+          .bins(x.ticks(50));
 
+        var hist_desktop = hist(scope.data_desktop);
+        var hist_mobile = hist(scope.data_mobile);
+        var hist_total = hist(data_merged);
+        hist_desktop.css_class = 'desktop';
+        hist_mobile.css_class = 'mobile';
         var y = d3.scale.linear()
-          .domain([0, d3.max(hist, function(d) { return d.y; })])
+          .domain([0, d3.max([
+            d3.max(hist_mobile, function(d) { return d.y; }), 
+            d3.max(hist_desktop, function(d) { return d.y; })])])
           .range([attrs.height, margins.bottom]);
 
+        var stack = d3.layout.stack()([hist_desktop, hist_mobile]);
 
-        var bars = chart.selectAll('.bar')
-          .data(hist);
+        var sets = chart.selectAll('g.data-set')
+          .data(stack);
+        sets.enter().append('g')
+          .attr('class', function(d) { return 'data-set ' + d.css_class; });
+        sets.exit().remove();
+        var bars = sets.selectAll('.bar')
+          .data(function(d) { return d; });
         var new_bars = bars.enter().append('g')
           .attr('class', 'bar')
-          .attr('transform', function(d) { return 'translate('+ x(d.x) + ',' + y(d.y) + ')'; });
+          .attr('transform', function(d) { return 'translate('+ x(d.x) + ',' + y(d.y + d.y0) + ')'; });
         new_bars.append('rect')
           .attr('x', 1)
-          .attr('width', x(hist[0].dx) - 1)
+          .attr('width', x(hist_desktop[0].dx) - 1)
           .attr('height', function(d) { return attrs.height - y(d.y); });
 
-        new_bars.append('text')
-          .attr('dy', '-.75em')
-          .attr('y', 6)
-          .attr('x', x(hist[0].dx) / 2)
-          .attr('text-anchor', 'middle')
-          .text(function(d) { return d.y; });
+        chart.selectAll('text.total')
+          .data(hist_total).enter()
+          .append('text')
+            .attr('class', 'total')
+            .attr('dy', '-.5em')
+            .attr('text-anchor', 'middle')
+            .attr('y', function(d) { return y(d.y); })
+            .attr('x', function(d) { return x(d.x + d.dx/2); })
+            .text(function(d) { if (d.y === 0) { return ''; } return d.y; });
 
         xaxis.call(d3.svg.axis().scale(x).orient('bottom'));
       };
 
-      scope.$watch('data', redraw);
+      scope.$watch('data_desktop', redraw);
+      scope.$watch('data_mobile', redraw)
     }
   };
 });
@@ -540,7 +590,7 @@ gzipApp.directive('compressionRatioVisual', function() {
           .attr('y', 6)
           .attr('x', x(hist[0].dx) / 2)
           .attr('text-anchor', 'middle')
-          .text(function(d) { return d.y; });
+          .text(function(d) { if (d.y === 0) { return ''; } return d.y; });
 
         xaxis.call(
           d3.svg.axis().scale(x).orient('bottom').tickFormat(d3.format('%')));
@@ -648,7 +698,7 @@ gzipApp.directive('secondsSavedVisual', function() {
           .attr('x', x(hist[0].dx) / 2)
           .attr('opacity', 0)
           .attr('text-anchor', 'middle')
-          .text(function(d) { return d.y; });
+          .text(function(d) { if (d.y === 0) { return ''; } return d.y; });
 
         bars.transition().duration(scope.animation_duration)
           .attr('transform', function(d) { return 'translate('+ x(d.x) + ',' + y(d.y) + ')'; });
@@ -663,7 +713,7 @@ gzipApp.directive('secondsSavedVisual', function() {
           .attr('y', 6)
           .attr('x', x(hist[0].dx) / 2)
           .attr('text-anchor', 'middle')
-          .text(function(d) { return d.y; })
+          .text(function(d) { if (d.y === 0) { return; ''; } return d.y; })
           .attr('opacity', 1);
 
         bars.exit().remove();
