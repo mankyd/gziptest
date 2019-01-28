@@ -95,22 +95,22 @@
           <a href="http://en.wikipedia.org/wiki/Slow-start">TCP Slow-start</a>.
           I use the term "villain" lightly here because it is actually a very
           useful mechanism for general internet traffic. It prevents competing
-          streams of data from stomping all over reach other and mucking up the
-          internet for everyone. The problem is that slow-start, in terms of 
-          wall-clock time, is quite high for small data payloads such as HTML 
+          streams of data from stomping all over each other and mucking up the
+          internet for everyone. The problem is that slow-start's costs, in terms
+          of wall-clock time, is quite high for small data payloads such as HTML 
           and other web content relative to their size.
         </p>
         <p>
           The basic mechanism for slow start goes as such: send a small amount
-          of data. If that goes smoothly, send a little more data than before.
-          Keep doing this until either everything has been sent or data starts 
-          getting lost. When data is lost, back up and restart the process, 
-          starting with the data that was lost. This generally works well when
-          one needs to send a large amount of data: you ramp up the amount of 
-          data that you're sending and then hover on or around the maximum 
-          sending size until you've sent all of your data. When working with 
-          large amounts of data, this ramp up occurs quickly. The few extra 
-          round trips that are incurred at the beginning are inconsequential 
+          of data and wait for it to transfer. If that goes smoothly, send a little
+          more data than before. Keep doing this until either everything has been
+          sent or data starts getting lost. When data is lost, back up a little,
+          and restart the process, starting with the data that was lost. This 
+          generally works well when one needs to send a large amount of data: you
+          ramp up the amount of data that you're sending and then hover on or 
+          around the maximum sending size until you've sent all of your data. When
+          working with large amounts of data, this ramp up occurs quickly. The few
+          extra round trips that are incurred at the beginning are inconsequential 
           relative to the total send time for the payload.
         </p>
         <p>
@@ -202,9 +202,12 @@
         <p>
           The two visuals above should help convey the round trip costs 
           associated with TCP slow-start as well as the savings that gzip
-          provides. By fitting the payload into fewer packets, we reduce the 
-          number of round trips that need to occur and thus avoid the associated
-          latency costs.
+          provides. The first graph shows how the largest site I found loads,
+          both with and without gzip turned on. By fitting the compressing the 
+          data and fitting it into fewer packets, we reduce the number of round 
+          trips that occur and thus avoid the associated latency costs. The 
+          second histogram demonstrates the estimated number of round-trips 
+          saved for all of the sampled sites.
         </p>
         <p>
           Notice that there is a statistically significant number of sites for
@@ -259,12 +262,13 @@
             words, gzip is very fast!
           </figcaption>
         </figure>
+================================================================================
         <p>
           And this brings up back full circle to the <em>costs</em> of using 
           gzip. As the figure above shows, gzip is cheap. It is generally two 
-          orders of magnitude faster than even a single rtt. Thus, if 
-          compressing your content might possibly save you even a single round
-          trip, it will easily be worth the nominal expense.
+          orders of magnitude faster than even a single round trip time. Thus,
+          if compressing your content might possibly save you even a single
+          round trip, it will easily be worth the nominal expense.
         </p>
 
         <h2 id="conclusion">Conclusion</h2>
@@ -278,7 +282,7 @@
         </p>
         <p>
           Even on desktops, where RTTs can get closer to 20ms on a good day, you
-          can expect every saved round trip to count. Decompression on desktops
+          can expect every saved round-trip to count. Decompression on desktops
           is blazingly fast &mdash; virtually free when compared against the 
           other bottlenecks involved. You can easily expect to save 100ms or 
           more in common cases.
